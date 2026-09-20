@@ -7,12 +7,9 @@ module Lupa
 
     def initialize(path = Dir.pwd)
       @root = File.expand_path(path)
+      @db = File.join(@root, DB_RELATIVE)
     end
 
-    attr_reader :root
-
-    def db
-      File.join(@root, DB_RELATIVE)
-    end
+    attr_reader :root, :db
   end
 end
