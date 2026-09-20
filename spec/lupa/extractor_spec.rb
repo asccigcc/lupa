@@ -94,6 +94,49 @@ RSpec.describe Lupa::Extractor do
     end
   end
 
+  describe "routes" do
+    it "records an explicit `to:` route as a `routes` edge to its controller" do
+      srcs = edges(rel: "routes", dst: "ThingsController").map(&:src)
+      expect(srcs).to include("GET /things", "POST /things/bulk")
+    end
+
+    it "resolves the hash-rocket (verb => target) form" do
+      expect(edges(src: "GET /up", rel: "routes", dst: "ThingsController")).not_to be_empty
+    end
+
+    it "camelizes a namespaced controller path from devise_for" do
+      expect(edges(rel: "routes", dst: "Patients::RegistrationsController")).not_to be_empty
+    end
+
+    it "maps a resource inside a namespace to the prefixed controller" do
+      expect(edges(rel: "routes", dst: "Admin::WidgetsController")).not_to be_empty
+    end
+
+    it "prefixes the controller module from `scope module:`" do
+      expect(edges(src: "PATCH /widgets/sync", rel: "routes", dst: "Admin::WidgetsController")).not_to be_empty
+    end
+
+    it "treats a leading-slash `to:` as absolute, ignoring the module scope" do
+      expect(edges(src: "GET /abs", rel: "routes", dst: "ThingsController")).not_to be_empty
+    end
+
+    it "pluralizes a singular resource to name its controller" do
+      expect(edges(src: "RESOURCE /thing", rel: "routes", dst: "ThingsController")).not_to be_empty
+    end
+
+    it "honors an explicit controller: override on a resource" do
+      expect(edges(src: "RESOURCES /gadgets", rel: "routes", dst: "ThingsController")).not_to be_empty
+    end
+
+    it "records the route itself as a node of kind route" do
+      expect(node("GET /things").kind).to eq("route")
+    end
+
+    it "drops a route whose controller is not defined in the repo" do
+      expect(edges(rel: "routes", dst: "External::ApiController")).to be_empty
+    end
+  end
+
   describe "resolution" do
     it "prefers an exact full-name match over an ambiguous short name" do
       # `DoThing` is also defined as Foo::DoThing, but the top-level call resolves

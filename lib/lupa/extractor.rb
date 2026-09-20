@@ -43,6 +43,13 @@ module Lupa
         raw_edges.concat(walker.edges)
       end
 
+      each_route_file do |path, rel|
+        walker = RouteWalker.new(file: rel)
+        Prism.parse(File.read(path)).value.accept(walker)
+        nodes.concat(walker.nodes)
+        raw_edges.concat(walker.edges)
+      end
+
       nodes.uniq!(&:name)
       Result.new(nodes, resolve(nodes, raw_edges), @scan_dir.delete_prefix("#{@root}/"))
     end
@@ -61,6 +68,24 @@ module Lupa
 
         yield path, rel
       end
+    end
+
+    # Rails routes live outside app/ (which each_file scans), so pick them up
+    # explicitly: config/routes.rb plus any config/routes/*.rb split files.
+    def each_route_file
+      route_files.each do |path|
+        rel = path.delete_prefix("#{@root}/")
+        result = Prism.parse(File.read(path))
+        next if result.failure?
+
+        yield path, rel
+      end
+    end
+
+    def route_files
+      main = File.join(@root, "config", "routes.rb")
+      files = File.file?(main) ? [main] : []
+      files + Dir.glob(File.join(@root, "config", "routes", "*.rb")).sort
     end
 
     def kind_for(relpath)

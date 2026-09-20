@@ -36,14 +36,21 @@ edges(src TEXT, rel TEXT, dst TEXT, line INTEGER)   -- src/dst are node names
 ```
 
 - `kind`: controller, interactor, model, job, service, policy, mailer,
-  component, serializer, concern, module, other.
+  component, serializer, concern, module, route, other.
 - `rel`: `calls` (`Const.call`), `enqueues` (`perform_later/async/...`),
   `organizes` (Interactor::Organizer steps), `invokes` (any other
   `Const.class_method(...)` on a repo constant; the ActiveRecord query surface —
   `find`/`where`/`create`/`new`/… — is excluded, but scopes and custom class
   methods are kept), `association` (has_many/belongs_to/…, honoring an explicit
   `class_name:` and falling back to the Rails naming convention; `polymorphic:
-  true` is dropped), `includes`, `inherits`, `dispatches`.
+  true` is dropped), `includes`, `inherits`, `dispatches`, `routes`.
+- `routes` connects the HTTP layer to a controller: a `route` node (e.g.
+  `POST /things/bulk`, `DEVISE /patients/registrations`) → the controller it
+  targets. Start a trace from a URL/path here — `lupa callers SomeController`
+  lists the routes that reach it. Parsed statically, so it covers explicit
+  `to:`/hash-rocket routes, `devise_for controllers:`, and `resources`/`resource`
+  (with `namespace`/`scope module:` prefixing); it does **not** expand a
+  `resources` into its individual REST paths.
 - `dispatches` is special: a `constantize`/`safe_constantize` call whose target
   is computed at runtime. `dst` is **not a node** — it's the receiver source
   (e.g. `validate_action_class`), a signpost that the chain forks dynamically

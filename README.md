@@ -25,6 +25,7 @@ handoffs Rails actually uses.
 | `includes` | concern/module includes |
 | `inherits` | superclass |
 | `dispatches` | a `constantize` / `safe_constantize` fork — target computed at runtime |
+| `routes` | a `config/routes.rb` entry → the controller it points at (`route` node → controller) |
 
 **Trust model:** a resolved edge is recorded only when the receiver constant
 resolves to a class/module defined in the repo. Calls on local variables and
@@ -87,6 +88,11 @@ version manager ruby.
 - `association` targets honor an explicit `class_name:`, fall back to the naming
   convention otherwise, and drop `polymorphic: true` (no single target).
 - Ambiguous short constant names that can't be uniquely resolved are dropped.
+- `routes` are parsed statically (no `rails routes` boot): explicit `to:`/hash-rocket
+  routes, `devise_for controllers:`, and `resources`/`resource` with
+  `namespace`/`scope module:` prefixing. The long tail — the individual REST paths
+  a `resources` expands to, `member`/`collection`, constraints, mounted engines —
+  is under-reported.
 
 ## Development
 
