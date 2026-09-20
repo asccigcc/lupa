@@ -20,14 +20,24 @@ handoffs Rails actually uses.
 | `calls` | `SomeInteractor.call(...)` |
 | `enqueues` | `SomeJob.perform_later/async/...` |
 | `organizes` | `Interactor::Organizer` steps |
+| `invokes` | any other `SomeClass.class_method(...)` on a repo constant |
 | `association` | `has_many` / `belongs_to` / … (by naming convention) |
 | `includes` | concern/module includes |
 | `inherits` | superclass |
+| `dispatches` | a `constantize` / `safe_constantize` fork — target computed at runtime |
 
-**Trust model:** an edge is recorded only when the receiver constant resolves to
-a class/module defined in the repo. Dynamic dispatch, calls on local variables,
-and `class_name:` overrides are **dropped, not guessed** — the graph
-under-reports rather than lies.
+**Trust model:** a resolved edge is recorded only when the receiver constant
+resolves to a class/module defined in the repo. Calls on local variables and
+`class_name:` overrides are **dropped, not guessed** — the graph under-reports
+rather than lies. The one exception is `dispatches`: dynamic dispatch can't be
+resolved, so instead of dropping it silently lupa records a marker keyed on the
+receiver source (e.g. `dispatches → validate_action_class`) so the chain forks
+*visibly* — telling you where to look rather than pretending nothing happens.
+
+> `invokes` deliberately excludes the ActiveRecord query/persistence surface
+> (`find`, `where`, `create`, `new`, …) so business-logic class-method calls
+> aren't buried under a `Model.find` firehose. Scopes and custom class methods
+> are arbitrary names and *are* recorded.
 
 ## Install
 

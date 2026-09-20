@@ -10,6 +10,21 @@ module Lupa
     CALL_METHODS    = %w[call call!].freeze
     ENQUEUE_METHODS = %w[perform_later perform_async perform_now perform_in perform_at].freeze
     ASSOCIATIONS    = %w[has_many has_one belongs_to has_and_belongs_to_many].freeze
+    DYNAMIC_METHODS = %w[constantize safe_constantize].freeze
+
+    # Constant-receiver methods too ubiquitous to be useful as `invokes` edges:
+    # the ActiveRecord query/persistence surface plus `.new`. Recording these
+    # would bury the business-logic class-method calls we actually want under a
+    # firehose of `Model.find` / `Model.where`. Tunable — err toward dropping.
+    NOISY_METHODS = %w[
+      new find find! find_by find_by! find_each find_in_batches where where! not
+      all none first last second take pluck ids exists? any? many? count size sum
+      average minimum maximum create create! build update update! update_all
+      insert insert_all upsert upsert_all destroy destroy_all delete delete_all
+      order reorder includes preload eager_load joins left_joins references
+      select distinct group having limit offset unscoped from lock readonly
+      find_or_create_by find_or_create_by! find_or_initialize_by first_or_create
+    ].freeze
 
     attr_reader :nodes, :edges
 
@@ -70,9 +85,21 @@ module Lupa
       return if current.empty?
 
       name = node.name.to_s
+      return if dynamic_edge(node, name)
       return if macro_edge(node, name)
 
       handoff_edge(node, name)
+    end
+
+    # Const.constantize / expr.safe_constantize — the target is computed at
+    # runtime, so we can't resolve it. Record a `dispatches` marker keyed on the
+    # receiver's source so a chain forks visibly here instead of ending silently.
+    def dynamic_edge(node, name)
+      return false unless DYNAMIC_METHODS.include?(name) && node.receiver
+
+      label = node.receiver.slice.gsub(/\s+/, " ")
+      @edges << Edge.new(current, "dispatches", label[0, 80], node.location.start_line)
+      true
     end
 
     # include/organize/association macros — targets come from the arguments.
@@ -90,16 +117,24 @@ module Lupa
       true
     end
 
-    # Const.call / Const.perform_later — target is the receiver constant.
+    # Const.<method> — target is the receiver constant. `.call`/`.call!` are the
+    # interactor handoff (`calls`), the perform_* family is `enqueues`, and any
+    # other non-noisy class-method call is a generic `invokes`. Resolution later
+    # drops receivers that aren't repo constants, so Time/Rails/etc. never stick.
     def handoff_edge(node, name)
       recv = node.receiver
       return unless recv.is_a?(Prism::ConstantReadNode) || recv.is_a?(Prism::ConstantPathNode)
 
-      rel =
-        if CALL_METHODS.include?(name) then "calls"
-        elsif ENQUEUE_METHODS.include?(name) then "enqueues"
-        end
+      rel = rel_for(name)
       add(node, rel, self.class.const_string(recv)) if rel
+    end
+
+    def rel_for(name)
+      if CALL_METHODS.include?(name) then "calls"
+      elsif ENQUEUE_METHODS.include?(name) then "enqueues"
+      elsif NOISY_METHODS.include?(name) then nil
+      else "invokes"
+      end
     end
 
     def add(node, rel, const)

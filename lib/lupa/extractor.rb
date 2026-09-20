@@ -78,6 +78,10 @@ module Lupa
       end
 
       edges.filter_map do |edge|
+        # `dispatches` targets are runtime-computed code, not constants — keep
+        # them verbatim rather than trying (and failing) to resolve them.
+        next edge if edge.rel == "dispatches"
+
         target = resolve_const(edge.dst, by_full, by_short)
         next unless target
 

@@ -61,6 +61,23 @@ RSpec.describe Lupa::Extractor do
       expect(edges(src: "ThingsController", rel: "inherits", dst: "ApplicationController")).not_to be_empty
       expect(edges(src: "NotifyJob", rel: "inherits", dst: "ApplicationJob")).not_to be_empty
     end
+
+    it "records a non-noisy class-method call on a repo constant as `invokes`" do
+      expect(edges(src: "DoThing", rel: "invokes", dst: "Widget")).not_to be_empty
+    end
+
+    it "does not record noisy ActiveRecord methods as `invokes`" do
+      expect(edges(src: "DoThing", rel: "invokes", dst: "Thing")).to be_empty
+    end
+
+    it "drops an `invokes` whose receiver is not defined in the repo" do
+      expect(edges(src: "DoThing", dst: "External::Api")).to be_empty
+    end
+
+    it "records constantize/safe_constantize as a `dispatches` marker keyed on the receiver" do
+      dispatched = edges(src: "DoThing", rel: "dispatches").map(&:dst)
+      expect(dispatched).to contain_exactly("handler_class")
+    end
   end
 
   describe "resolution" do
