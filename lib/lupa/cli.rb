@@ -10,6 +10,12 @@ module Lupa
   class CLI
     DB_RELATIVE = "tmp/lupa.db"
 
+    DISPATCH = {
+      "scan" => :scan, "query" => :query, "callers" => :callers,
+      "calls" => :calls, "where" => :where, "stats" => :stats
+    }.freeze
+    HELP = [nil, "help", "-h", "--help"].freeze
+
     def initialize(argv, out: $stdout, err: $stderr)
       @argv = argv.dup
       @out = out
@@ -17,17 +23,7 @@ module Lupa
     end
 
     def run
-      command = @argv.shift
-      case command
-      when "scan"           then scan(@argv.first)
-      when "query"          then run_sql(fetch_arg)
-      when "callers"        then run_sql(Queries.callers(fetch_arg))
-      when "calls"          then run_sql(Queries.calls(fetch_arg))
-      when "where"          then run_sql(Queries.where(fetch_arg))
-      when "stats"          then stats
-      when nil, "help", "-h", "--help" then help
-      else raise Error, "lupa: unknown command #{command.inspect} (try: lupa help)"
-      end
+      send(command_for(@argv.shift))
       0
     rescue Error => e
       @err.puts(e.message)
@@ -36,8 +32,19 @@ module Lupa
 
     private
 
-    def scan(path)
-      root = File.expand_path(path || Dir.pwd)
+    def command_for(command)
+      return :help if HELP.include?(command)
+
+      DISPATCH[command] or raise Error, "lupa: unknown command #{command.inspect} (try: lupa help)"
+    end
+
+    def query   = run_sql(fetch_arg)
+    def callers = run_sql(Queries.callers(fetch_arg))
+    def calls   = run_sql(Queries.calls(fetch_arg))
+    def where   = run_sql(Queries.where(fetch_arg))
+
+    def scan
+      root = File.expand_path(@argv.shift || Dir.pwd)
       db = File.join(root, DB_RELATIVE)
       FileUtils.mkdir_p(File.dirname(db))
 
