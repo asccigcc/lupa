@@ -1,5 +1,8 @@
+*.gem
 *.db
 *.sql
+/pkg/
+/Gemfile.lock
 tmp/
 coverage/
 .bundle/

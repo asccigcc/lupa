@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "prism"
-require_relative "graph"
 
 module Lupa
   # Visits one parsed file, collecting Nodes (class/module definitions) and raw

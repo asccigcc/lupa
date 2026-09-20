@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "lupa/extractor"
-
 RSpec.describe Lupa::Extractor do
   subject(:result) { described_class.call(root: FIXTURE_REPO) }
 

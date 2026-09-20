@@ -1,9 +1,6 @@
 # frozen_string_literal: true
 
 module Lupa
-  # A defined class/module. `name` is the fully-qualified constant path.
-  Node = Struct.new(:name, :kind, :file, :line)
-
   # A relationship between two constants. Walker fills `dst` with the raw,
   # unresolved constant string; Extractor rewrites it to a resolved node name
   # (or drops the edge if it can't be resolved within the repo).

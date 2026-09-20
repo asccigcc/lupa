@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 require "prism"
-require_relative "graph"
-require_relative "walker"
 
 module Lupa
   # Walks a repo and produces a resolved interaction graph.

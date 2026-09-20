@@ -3,10 +3,11 @@
 require "simplecov"
 SimpleCov.start do
   add_filter "/spec/"
+  add_filter "lib/lupa/cli.rb" # thin IO glue that shells out to sqlite3
   minimum_coverage 90
 end
 
-$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "lupa"
 
 FIXTURE_REPO = File.expand_path("fixtures/repo", __dir__)
 

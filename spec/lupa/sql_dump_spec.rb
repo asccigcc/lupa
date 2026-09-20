@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require "lupa/graph"
-require "lupa/sql_dump"
-
 RSpec.describe Lupa::SqlDump do
   let(:result) do
     Struct.new(:nodes, :edges).new(

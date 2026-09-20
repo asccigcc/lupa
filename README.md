@@ -31,13 +31,22 @@ under-reports rather than lies.
 
 ## Install
 
+lupa is a gem. Clone and run the installer, which builds & installs the gem
+(putting `lupa` on PATH via RubyGems) and links the Claude skill into
+`~/.claude/skills`:
+
 ```bash
-git clone <this-repo> lupa
-cd lupa && ./install.sh        # symlinks `lupa` onto PATH + the skill into ~/.claude/skills
+git clone git@github.com:asccigcc/lupa.git
+cd lupa && ./install.sh
 ```
 
-Prereqs: **Ruby 3.3+** (Prism ships built in; set `LUPA_RUBY` to pin one) and the
-**sqlite3** CLI.
+Or manage it yourself:
+
+```bash
+gem build lupa.gemspec && gem install ./lupa-*.gem   # just the CLI
+```
+
+Prereqs: **Ruby 3.3+** (Prism ships built in) and the **sqlite3** binary.
 
 ## Use
 
@@ -58,7 +67,9 @@ full query cookbook and schema.
 ## Portability
 
 Clone on any machine, run `./install.sh`, then `lupa scan` in any repo. The graph
-is per-repo at `<repo>/tmp/lupa.db`; one install serves every project.
+is per-repo at `<repo>/tmp/lupa.db`; one install serves every project. The gem
+executable pins its own Ruby, so it works even inside repos that pin a different
+version manager ruby.
 
 ## Limitations (it's young)
 
@@ -73,10 +84,12 @@ bundle install
 bundle exec rspec        # suite runs against spec/fixtures/repo, a tiny fake app
 ```
 
-The extractor is split into small, testable classes under `lib/lupa/`:
+The gem uses [Zeitwerk](https://github.com/fxn/zeitwerk) autoloading
+(`lib/lupa.rb`). The extractor is split into small, testable classes under `lib/lupa/`:
 `Walker` (per-file AST visit), `Extractor` (globbing + constant resolution),
-`SqlDump` (SQLite rendering). `lib/lupa/extract.rb` is the thin CLI entrypoint.
-Coverage is enforced at 90% via SimpleCov; CI runs the suite on Ruby 3.3 and 3.4.
+`SqlDump` (SQLite rendering), `Queries` (read SQL), and `CLI`. `exe/lupa` is the
+thin executable. Coverage is enforced at 90% via SimpleCov (the CLI's IO glue is
+filtered out); CI runs the suite on Ruby 3.3 and 3.4.
 
 ## License
 
