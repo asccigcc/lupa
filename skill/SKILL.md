@@ -46,7 +46,7 @@ edges(src TEXT, rel TEXT, dst TEXT, line INTEGER)   -- src/dst are node names
   true` is dropped), `emails` (`SomeMailer.action(...).deliver_later`/`deliver_now`
   — the mail-send analog of `enqueues`; the mailer-action call is recorded as
   this instead of a generic `invokes`), `includes`, `inherits`, `dispatches`,
-  `routes`.
+  `triggers`, `routes`.
 - `routes` connects the HTTP layer to a controller: a `route` node (e.g.
   `POST /things/bulk`, `DEVISE /patients/registrations`) → the controller it
   targets. Start a trace from a URL/path here — `lupa callers SomeController`
@@ -59,6 +59,12 @@ edges(src TEXT, rel TEXT, dst TEXT, line INTEGER)   -- src/dst are node names
   (e.g. `validate_action_class`), a signpost that the chain forks dynamically
   *here*. Read that receiver/method to follow it; don't expect `callers` to find
   the far side.
+- `triggers` is also a marker: an AR lifecycle callback (`after_create_commit
+  :notify_patient`). `dst` is the **method name** it runs, a same-class method —
+  **not a node**. It answers "what fires when this record is saved/created/…?" —
+  a lifecycle entry point on the node. To follow it, read that method in the same
+  class (its own outgoing edges, e.g. `emails`/`enqueues`, are recorded on the
+  class node). `callers` won't traverse a `triggers` marker.
 
 ## Useful raw queries
 

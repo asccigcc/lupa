@@ -13,6 +13,20 @@ module Lupa
     DYNAMIC_METHODS = %w[constantize safe_constantize].freeze
     DELIVER_METHODS = %w[deliver_later deliver_now].freeze
 
+    # ActiveRecord lifecycle callback macros. Each wires a lifecycle event to a
+    # method — almost always a same-class symbol, which is not a node, so we
+    # record it as a `triggers` marker (see macro_edge) rather than an edge to a
+    # constant. Explicit list to avoid catching lookalikes (after_sign_in_path_for).
+    CALLBACK_METHODS = %w[
+      before_validation after_validation
+      before_save around_save after_save after_save_commit
+      before_create around_create after_create after_create_commit
+      before_update around_update after_update after_update_commit
+      before_destroy around_destroy after_destroy after_destroy_commit
+      before_commit after_commit after_rollback
+      after_initialize after_find after_touch
+    ].freeze
+
     # Constant-receiver methods too ubiquitous to be useful as `invokes` edges:
     # the ActiveRecord query/persistence surface plus `.new`. Recording these
     # would bury the business-logic class-method calls we actually want under a
@@ -138,6 +152,8 @@ module Lupa
       elsif ASSOCIATIONS.include?(name)
         target = association_target(node)
         add(node, "association", target) if target
+      elsif CALLBACK_METHODS.include?(name)
+        each_symbol_arg(node) { |m| add(node, "triggers", m) }
       else
         return false
       end
@@ -207,6 +223,14 @@ module Lupa
     def first_symbol_arg(node)
       arg = node.arguments&.arguments&.first
       arg.unescaped.to_sym if arg.is_a?(Prism::SymbolNode)
+    end
+
+    # Positional symbol arguments only — `after_save :a, :b, if: :cond` yields
+    # "a" and "b", never the `if:` option's value (a keyword hash, not a symbol).
+    def each_symbol_arg(node)
+      node.arguments&.arguments&.each do |arg|
+        yield arg.unescaped if arg.is_a?(Prism::SymbolNode)
+      end
     end
   end
 end

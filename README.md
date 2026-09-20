@@ -26,15 +26,18 @@ handoffs Rails actually uses.
 | `includes` | concern/module includes |
 | `inherits` | superclass |
 | `dispatches` | a `constantize` / `safe_constantize` fork — target computed at runtime |
+| `triggers` | an AR lifecycle callback (`after_create_commit :notify`) → the method it runs (a marker, not a node) |
 | `routes` | a `config/routes.rb` entry → the controller it points at (`route` node → controller) |
 
 **Trust model:** a resolved edge is recorded only when the receiver constant
 resolves to a class/module defined in the repo. Calls on local variables and
 `class_name:` overrides are **dropped, not guessed** — the graph under-reports
-rather than lies. The one exception is `dispatches`: dynamic dispatch can't be
-resolved, so instead of dropping it silently lupa records a marker keyed on the
-receiver source (e.g. `dispatches → validate_action_class`) so the chain forks
-*visibly* — telling you where to look rather than pretending nothing happens.
+rather than lies. Two rels are **markers**, not resolved edges: `dispatches`
+(dynamic dispatch can't be resolved, so lupa records a signpost keyed on the
+receiver source, e.g. `dispatches → validate_action_class`, so the chain forks
+*visibly* instead of vanishing) and `triggers` (a lifecycle callback's target is
+a same-class method, not a constant, so `dst` is the method name — a lifecycle
+entry point you can see when you read the node, not a traversable node link).
 
 > `invokes` deliberately excludes the ActiveRecord query/persistence surface
 > (`find`, `where`, `create`, `new`, …) so business-logic class-method calls

@@ -103,9 +103,10 @@ module Lupa
       end
 
       edges.filter_map do |edge|
-        # `dispatches` targets are runtime-computed code, not constants — keep
-        # them verbatim rather than trying (and failing) to resolve them.
-        next edge if edge.rel == "dispatches"
+        # `dispatches` targets are runtime-computed code and `triggers` targets
+        # are same-class method names — neither is a constant, so keep them
+        # verbatim rather than trying (and failing) to resolve them to a node.
+        next edge if %w[dispatches triggers].include?(edge.rel)
 
         target = resolve_const(edge.dst, by_full, by_short)
         next unless target

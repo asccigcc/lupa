@@ -107,6 +107,31 @@ RSpec.describe Lupa::Extractor do
     end
   end
 
+  describe "callbacks" do
+    it "records a lifecycle callback's symbol target as a `triggers` marker" do
+      expect(edges(src: "Thing", rel: "triggers").map(&:dst)).to include("notify_owner")
+    end
+
+    it "records one `triggers` edge per symbol when several are given" do
+      expect(edges(src: "Thing", rel: "triggers").map(&:dst)).to include("normalize", "stamp")
+    end
+
+    it "keeps the symbol target verbatim — a method name, never resolved as a node" do
+      expect(edges(src: "Thing", rel: "triggers", dst: "notify_owner")).not_to be_empty
+      expect(node("notify_owner")).to be_nil
+    end
+
+    it "ignores the if:/unless: option, recording only the callback method" do
+      triggered = edges(src: "Thing", rel: "triggers").map(&:dst)
+      expect(triggered).to include("recount")
+      expect(triggered).not_to include("changed?")
+    end
+
+    it "drops a block-form callback that names no method symbol" do
+      expect(edges(src: "Thing", rel: "triggers").map(&:dst)).not_to include("cleanup")
+    end
+  end
+
   describe "routes" do
     it "records an explicit `to:` route as a `routes` edge to its controller" do
       srcs = edges(rel: "routes", dst: "ThingsController").map(&:src)
