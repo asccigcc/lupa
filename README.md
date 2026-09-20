@@ -21,7 +21,7 @@ handoffs Rails actually uses.
 | `enqueues` | `SomeJob.perform_later/async/...` |
 | `organizes` | `Interactor::Organizer` steps |
 | `invokes` | any other `SomeClass.class_method(...)` on a repo constant |
-| `association` | `has_many` / `belongs_to` / … (by naming convention) |
+| `association` | `has_many` / `belongs_to` / … (`class_name:` if given, else naming convention) |
 | `includes` | concern/module includes |
 | `inherits` | superclass |
 | `dispatches` | a `constantize` / `safe_constantize` fork — target computed at runtime |
@@ -84,7 +84,8 @@ version manager ruby.
 ## Limitations (it's young)
 
 - Rails/Ruby only; constant-based handoffs only (no runtime/metaprogrammed dispatch).
-- `association` targets are inferred from the symbol; `class_name:` is not read.
+- `association` targets honor an explicit `class_name:`, fall back to the naming
+  convention otherwise, and drop `polymorphic: true` (no single target).
 - Ambiguous short constant names that can't be uniquely resolved are dropped.
 
 ## Development

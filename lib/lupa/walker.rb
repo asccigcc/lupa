@@ -109,12 +109,41 @@ module Lupa
       elsif name == "organize"
         each_const_arg(node) { |c| add(node, "organizes", c) }
       elsif ASSOCIATIONS.include?(name)
-        sym = first_symbol_arg(node)
-        add(node, "association", self.class.classify(sym)) if sym
+        target = association_target(node)
+        add(node, "association", target) if target
       else
         return false
       end
       true
+    end
+
+    # An explicit `class_name:` wins over the naming convention (that guess is
+    # wrong whenever the two differ). `polymorphic: true` has no single target,
+    # so drop it rather than invent one. Otherwise classify the association name.
+    def association_target(node)
+      opts = keyword_args(node)
+      return nil if opts["polymorphic"].is_a?(Prism::TrueNode)
+      return const_literal(opts["class_name"]) if opts.key?("class_name")
+
+      sym = first_symbol_arg(node)
+      self.class.classify(sym) if sym
+    end
+
+    # Symbol-keyed keyword arguments of a call, as { "key" => value_node }.
+    def keyword_args(node)
+      last = node.arguments&.arguments&.last
+      return {} unless last.is_a?(Prism::KeywordHashNode) || last.is_a?(Prism::HashNode)
+
+      last.elements.each_with_object({}) do |el, acc|
+        next unless el.is_a?(Prism::AssocNode) && el.key.is_a?(Prism::SymbolNode)
+
+        acc[el.key.unescaped] = el.value
+      end
+    end
+
+    # The constant name a string/symbol literal names, e.g. 'Ephemeral::Patient'.
+    def const_literal(node)
+      node.unescaped if node.is_a?(Prism::StringNode) || node.is_a?(Prism::SymbolNode)
     end
 
     # Const.<method> — target is the receiver constant. `.call`/`.call!` are the

@@ -53,6 +53,20 @@ RSpec.describe Lupa::Extractor do
       expect(assoc).to contain_exactly("Widget", "Owner")
     end
 
+    it "honors an explicit class_name: over the naming convention" do
+      # belongs_to :main_widget, class_name: "Widget" -> Widget, never "MainWidget".
+      expect(edges(src: "Owner", rel: "association", dst: "Widget")).not_to be_empty
+      expect(edges(src: "Owner", dst: "MainWidget")).to be_empty
+    end
+
+    it "resolves a self-referential class_name:" do
+      expect(edges(src: "Owner", rel: "association", dst: "Owner")).not_to be_empty
+    end
+
+    it "drops a polymorphic association rather than guessing a target" do
+      expect(edges(src: "Owner", dst: "Subject")).to be_empty
+    end
+
     it "records concern includes" do
       expect(edges(src: "Thing", rel: "includes", dst: "Trackable")).not_to be_empty
     end

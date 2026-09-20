@@ -41,8 +41,9 @@ edges(src TEXT, rel TEXT, dst TEXT, line INTEGER)   -- src/dst are node names
   `organizes` (Interactor::Organizer steps), `invokes` (any other
   `Const.class_method(...)` on a repo constant; the ActiveRecord query surface —
   `find`/`where`/`create`/`new`/… — is excluded, but scopes and custom class
-  methods are kept), `association` (has_many/belongs_to/…, resolved by Rails
-  naming convention), `includes`, `inherits`, `dispatches`.
+  methods are kept), `association` (has_many/belongs_to/…, honoring an explicit
+  `class_name:` and falling back to the Rails naming convention; `polymorphic:
+  true` is dropped), `includes`, `inherits`, `dispatches`.
 - `dispatches` is special: a `constantize`/`safe_constantize` call whose target
   is computed at runtime. `dst` is **not a node** — it's the receiver source
   (e.g. `validate_action_class`), a signpost that the chain forks dynamically
@@ -68,8 +69,8 @@ SELECT src FROM edges WHERE rel='includes' AND dst='Trackable';
 ## Trust model — important
 
 lupa only records a resolved edge when the receiver constant resolves to a
-class/module defined in the repo. Calls on local variables and `class_name:`
-association overrides are **dropped, not guessed** — so the graph **under-reports
+class/module defined in the repo. Calls on local variables and unresolvable
+short constant names are **dropped, not guessed** — so the graph **under-reports
 rather than lies**. Treat a missing edge as "not statically resolvable," not
 "definitely absent." Dynamic constant dispatch is the exception: instead of
 vanishing, it's recorded as a `dispatches` marker so you can see where a chain
