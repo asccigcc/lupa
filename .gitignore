@@ -1,0 +1,4 @@
+*.db
+*.sql
+tmp/
+.DS_Store

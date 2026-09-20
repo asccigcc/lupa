@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# lupa — static code-interaction graph for AI agents.
+#
+#   lupa scan [PATH]        build/refresh the graph for a repo (default: cwd)
+#   lupa query "SQL"        run a SQL query against the repo's graph
+#   lupa callers NAME       who calls/enqueues NAME (with file:line)
+#   lupa calls NAME         what NAME calls/enqueues/organizes
+#   lupa where NAME         where NAME is defined
+#   lupa stats              node/edge counts
+#
+# The graph lives in <repo>/tmp/lupa.db. Requires Ruby 3.3+ (Prism is built in)
+# and the sqlite3 CLI.
+
+set -euo pipefail
+
+LUPA_HOME="$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
+EXTRACT="$LUPA_HOME/lib/lupa/extract.rb"
+
+# Return the first ruby that can actually load Prism. We test each candidate
+# because a version-manager shim can be first on PATH yet fail (e.g. the repo
+# pins a ruby that isn't installed) — a working ruby further down should win.
+find_ruby() {
+  local candidates=()
+  [[ -n "${LUPA_RUBY:-}" ]] && candidates+=("$LUPA_RUBY")
+  command -v ruby >/dev/null 2>&1 && candidates+=("ruby")
+  [[ -x "$HOME/.asdf/shims/ruby" ]] && candidates+=("$HOME/.asdf/shims/ruby")
+  while IFS= read -r rb; do candidates+=("$rb"); done < <(ls -d "$HOME"/.asdf/installs/ruby/*/bin/ruby 2>/dev/null | sort -Vr)
+
+  local rb
+  for rb in "${candidates[@]}"; do
+    if "$rb" -e "require 'prism'" >/dev/null 2>&1; then echo "$rb"; return; fi
+  done
+  echo "lupa: no ruby with Prism found (need Ruby 3.3+). Set LUPA_RUBY=/path/to/ruby." >&2
+  exit 1
+}
+
+repo_root() {
+  local p="${1:-$PWD}"
+  cd "$p" && pwd
+}
+
+db_path() { echo "$(repo_root "${1:-$PWD}")/tmp/lupa.db"; }
+
+require_db() {
+  local db="$1"
+  if [[ ! -f "$db" ]]; then
+    echo "lupa: no graph yet at $db — run 'lupa scan' in the repo first." >&2
+    exit 1
+  fi
+}
+
+cmd="${1:-}"; shift || true
+
+case "$cmd" in
+  scan)
+    root="$(repo_root "${1:-$PWD}")"
+    db="$root/tmp/lupa.db"
+    mkdir -p "$root/tmp"
+    ruby_bin="$(find_ruby)"
+    "$ruby_bin" "$EXTRACT" --root "$root" | sqlite3 "$db"
+    echo "lupa: graph written to $db"
+    ;;
+
+  query)
+    db="$(db_path)"; require_db "$db"
+    sqlite3 -column -header "$db" "$1"
+    ;;
+
+  callers)
+    db="$(db_path)"; require_db "$db"
+    sqlite3 -column -header "$db" \
+      "SELECT e.src AS caller, n.kind, e.rel, e.line FROM edges e JOIN nodes n ON n.name=e.src
+       WHERE e.dst='$1' AND e.rel IN ('calls','enqueues','organizes','includes','inherits','association')
+       ORDER BY n.kind, e.src;"
+    ;;
+
+  calls)
+    db="$(db_path)"; require_db "$db"
+    sqlite3 -column -header "$db" \
+      "SELECT rel, dst AS target, line FROM edges WHERE src='$1' ORDER BY line;"
+    ;;
+
+  where)
+    db="$(db_path)"; require_db "$db"
+    sqlite3 -column -header "$db" \
+      "SELECT name, kind, file, line FROM nodes WHERE name='$1' OR name LIKE '%::$1';"
+    ;;
+
+  stats)
+    db="$(db_path)"; require_db "$db"
+    echo "nodes by kind:"; sqlite3 -column -header "$db" "SELECT kind, count(*) n FROM nodes GROUP BY kind ORDER BY n DESC;"
+    echo; echo "edges by rel:"; sqlite3 -column -header "$db" "SELECT rel, count(*) n FROM edges GROUP BY rel ORDER BY n DESC;"
+    ;;
+
+  ""|-h|--help|help)
+    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+
+  *)
+    echo "lupa: unknown command '$cmd' (try: lupa help)" >&2
+    exit 1
+    ;;
+esac
