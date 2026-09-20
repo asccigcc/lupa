@@ -21,6 +21,7 @@ handoffs Rails actually uses.
 | `enqueues` | `SomeJob.perform_later/async/...` |
 | `organizes` | `Interactor::Organizer` steps |
 | `invokes` | any other `SomeClass.class_method(...)` on a repo constant |
+| `emails` | `SomeMailer.action(...).deliver_later/deliver_now` → the mailer |
 | `association` | `has_many` / `belongs_to` / … (`class_name:` if given, else naming convention) |
 | `includes` | concern/module includes |
 | `inherits` | superclass |

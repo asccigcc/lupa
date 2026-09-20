@@ -11,6 +11,7 @@ module Lupa
     ENQUEUE_METHODS = %w[perform_later perform_async perform_now perform_in perform_at].freeze
     ASSOCIATIONS    = %w[has_many has_one belongs_to has_and_belongs_to_many].freeze
     DYNAMIC_METHODS = %w[constantize safe_constantize].freeze
+    DELIVER_METHODS = %w[deliver_later deliver_now].freeze
 
     # Constant-receiver methods too ubiquitous to be useful as `invokes` edges:
     # the ActiveRecord query/persistence surface plus `.new`. Recording these
@@ -34,6 +35,7 @@ module Lupa
       @nodes = []
       @edges = []
       @scope = []
+      @consumed = {} # call-node object_ids folded into an enclosing edge (see mailer_edge)
       super()
     end
 
@@ -83,12 +85,37 @@ module Lupa
 
     def record_call(node)
       return if current.empty?
+      return if @consumed.delete(node.object_id) # the mailer-action call behind a deliver_*
 
       name = node.name.to_s
+      return if mailer_edge(node, name)
       return if dynamic_edge(node, name)
       return if macro_edge(node, name)
 
       handoff_edge(node, name)
+    end
+
+    # Mailer.action(...).deliver_later / .deliver_now — a mail send. Record it as
+    # an `emails` edge to the mailer class and mark the mailer-action call so it
+    # doesn't also surface as a redundant `invokes` on the same expression.
+    def mailer_edge(node, name)
+      return false unless DELIVER_METHODS.include?(name)
+
+      mailer = mailer_receiver(node.receiver)
+      return false unless mailer
+
+      @consumed[node.receiver.object_id] = true if node.receiver.is_a?(Prism::CallNode)
+      add(node, "emails", mailer)
+      true
+    end
+
+    # The constant a mailer-send chain roots at, unwrapping the `.action` / `.with`
+    # calls between the deliver and the mailer. nil if it isn't a constant.
+    def mailer_receiver(recv)
+      case recv
+      when Prism::ConstantReadNode, Prism::ConstantPathNode then self.class.const_string(recv)
+      when Prism::CallNode then mailer_receiver(recv.receiver)
+      end
     end
 
     # Const.constantize / expr.safe_constantize — the target is computed at

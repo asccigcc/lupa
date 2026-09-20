@@ -92,6 +92,19 @@ RSpec.describe Lupa::Extractor do
       dispatched = edges(src: "DoThing", rel: "dispatches").map(&:dst)
       expect(dispatched).to contain_exactly("handler_class")
     end
+
+    it "records a mailer deliver_later/deliver_now as an `emails` edge to the mailer" do
+      lines = edges(src: "DoThing", rel: "emails", dst: "NotifyMailer").map(&:line)
+      expect(lines.size).to eq(2) # one deliver_later, one deliver_now
+    end
+
+    it "suppresses the redundant `invokes` for a delivered mailer action" do
+      expect(edges(src: "DoThing", rel: "invokes", dst: "NotifyMailer")).to be_empty
+    end
+
+    it "drops a deliver whose receiver chain has no constant root" do
+      expect(edges(src: "DoThing", rel: "emails").map(&:dst)).to all(eq("NotifyMailer"))
+    end
   end
 
   describe "routes" do
