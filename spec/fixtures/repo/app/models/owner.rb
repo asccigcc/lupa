@@ -7,4 +7,6 @@ class Owner < ApplicationRecord
   belongs_to :parent, class_name: "Owner"
   # polymorphic has no single target -> dropped, not guessed.
   belongs_to :subject, polymorphic: true
+  # the other half of the ambiguous `gizmos` name (points to Owner, not Widget).
+  has_many :gizmos, class_name: "Owner"
 end

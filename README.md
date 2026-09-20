@@ -21,6 +21,7 @@ handoffs Rails actually uses.
 | `enqueues` | `SomeJob.perform_later/async/...` |
 | `organizes` | `Interactor::Organizer` steps |
 | `invokes` | any other `SomeClass.class_method(...)` on a repo constant |
+| `persists` | a write (`create!`/`update`/`destroy`/…) on a model constant or an association proxy (`patient.orders.create!`) → the model |
 | `emails` | `SomeMailer.action(...).deliver_later/deliver_now` → the mailer |
 | `association` | `has_many` / `belongs_to` / … (`class_name:` if given, else naming convention) |
 | `includes` | concern/module includes |
@@ -42,7 +43,17 @@ entry point you can see when you read the node, not a traversable node link).
 > `invokes` deliberately excludes the ActiveRecord query/persistence surface
 > (`find`, `where`, `create`, `new`, …) so business-logic class-method calls
 > aren't buried under a `Model.find` firehose. Scopes and custom class methods
-> are arbitrary names and *are* recorded.
+> are arbitrary names and *are* recorded. The *write* subset of that surface —
+> `create!`/`update`/`destroy`/… — is recovered separately as `persists` (below),
+> because it names a specific model being written: a real handoff, not query noise.
+
+> `persists` is how lupa follows a controller/service into a model without booting
+> Rails. It fires on a model constant (`Order.create!`) or an **association proxy**
+> (`patient.orders.create!` → `Order`, resolving `orders` through the app-wide
+> association graph). Reads (`find`/`where`) and `new`/`build` are excluded; an
+> ambiguous association name (one that targets different models in different
+> places, e.g. `child`) is dropped, not guessed; and the target must resolve to a
+> model, so `SomeService.create`-style writes on non-models never leak in.
 
 ## Install
 
@@ -92,6 +103,10 @@ version manager ruby.
 - `association` targets honor an explicit `class_name:`, fall back to the naming
   convention otherwise, and drop `polymorphic: true` (no single target).
 - Ambiguous short constant names that can't be uniquely resolved are dropped.
+- `persists` resolves an association proxy by **name** (`orders` → `Order`), not by
+  typing the receiver — so it can't tell two same-named associations apart and
+  drops the name when it targets different models across the app. `new`/`build`
+  aren't counted as writes yet.
 - `routes` are parsed statically (no `rails routes` boot): explicit `to:`/hash-rocket
   routes, `devise_for controllers:`, and `resources`/`resource` with
   `namespace`/`scope module:` prefixing. The long tail — the individual REST paths

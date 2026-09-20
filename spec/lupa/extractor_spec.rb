@@ -132,6 +132,33 @@ RSpec.describe Lupa::Extractor do
     end
   end
 
+  describe "persists" do
+    it "resolves an association-proxy write to the association's target model" do
+      # context.owner.widgets.create! -> `widgets` uniquely names Widget.
+      expect(edges(src: "DoThing", rel: "persists", dst: "Widget")).not_to be_empty
+    end
+
+    it "resolves a class-level write on a model constant" do
+      # both the assoc-proxy create and the constant Widget.create! land on Widget.
+      lines = edges(src: "DoThing", rel: "persists", dst: "Widget").map(&:line)
+      expect(lines.size).to eq(2)
+    end
+
+    it "drops a write through an ambiguous association name" do
+      # `gizmos` maps to both Widget and Owner across the app -> not resolvable.
+      expect(edges(src: "DoThing", rel: "persists", dst: "Owner")).to be_empty
+    end
+
+    it "does not record a read (where/find) on an association proxy as a write" do
+      expect(edges(src: "DoThing", rel: "persists").map(&:dst)).to all(eq("Widget"))
+    end
+
+    it "drops a write verb on a non-model constant" do
+      # NotifyJob.create -> a job, not a model -> filtered out of the write surface.
+      expect(edges(src: "DoThing", rel: "persists", dst: "NotifyJob")).to be_empty
+    end
+  end
+
   describe "routes" do
     it "records an explicit `to:` route as a `routes` edge to its controller" do
       srcs = edges(rel: "routes", dst: "ThingsController").map(&:src)

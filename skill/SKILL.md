@@ -41,7 +41,10 @@ edges(src TEXT, rel TEXT, dst TEXT, line INTEGER)   -- src/dst are node names
   `organizes` (Interactor::Organizer steps), `invokes` (any other
   `Const.class_method(...)` on a repo constant; the ActiveRecord query surface —
   `find`/`where`/`create`/`new`/… — is excluded, but scopes and custom class
-  methods are kept), `association` (has_many/belongs_to/…, honoring an explicit
+  methods are kept), `persists` (the *write* subset of that surface —
+  `create!`/`update`/`destroy`/… — on a model constant or an association proxy
+  `x.orders.create!`, resolved to the model; this is how a controller/service
+  reaches a model), `association` (has_many/belongs_to/…, honoring an explicit
   `class_name:` and falling back to the Rails naming convention; `polymorphic:
   true` is dropped), `emails` (`SomeMailer.action(...).deliver_later`/`deliver_now`
   — the mail-send analog of `enqueues`; the mailer-action call is recorded as

@@ -13,6 +13,17 @@ module Lupa
     DYNAMIC_METHODS = %w[constantize safe_constantize].freeze
     DELIVER_METHODS = %w[deliver_later deliver_now].freeze
 
+    # The ActiveRecord *write* surface — the create/update/destroy subset of the
+    # NOISY_METHODS that `invokes` drops. On a model constant (`Order.create!`) or
+    # an association proxy (`patient.orders.create!`) these name a specific model
+    # being written, which is a real handoff worth an edge. Reads (`find`/`where`)
+    # stay dropped. `new`/`build` are excluded from v1 (construction, not a write).
+    PERSIST_METHODS = %w[
+      create create! update update! update_all destroy destroy_all delete delete_all
+      find_or_create_by find_or_create_by! first_or_create first_or_create!
+      insert insert! insert_all upsert upsert_all save save!
+    ].freeze
+
     # ActiveRecord lifecycle callback macros. Each wires a lifecycle event to a
     # method — almost always a same-class symbol, which is not a node, so we
     # record it as a `triggers` marker (see macro_edge) rather than an edge to a
@@ -41,13 +52,14 @@ module Lupa
       find_or_create_by find_or_create_by! find_or_initialize_by first_or_create
     ].freeze
 
-    attr_reader :nodes, :edges
+    attr_reader :nodes, :edges, :associations
 
     def initialize(file:, kind:)
       @file = file
       @kind = kind
       @nodes = []
       @edges = []
+      @associations = [] # [assoc_name, raw_target] pairs; feeds the persists index
       @scope = []
       @consumed = {} # call-node object_ids folded into an enclosing edge (see mailer_edge)
       super()
@@ -105,8 +117,30 @@ module Lupa
       return if mailer_edge(node, name)
       return if dynamic_edge(node, name)
       return if macro_edge(node, name)
+      return if persist_edge(node, name)
 
       handoff_edge(node, name)
+    end
+
+    # A create/update/destroy on a model constant (`Order.create!`) or on an
+    # association proxy (`patient.orders.create!`). Record a `persists` edge; the
+    # dst is either the constant string or the association accessor name, and
+    # Extractor resolves the latter through the app-wide association index. Reads
+    # and non-write methods fall through to handoff_edge (usually dropped).
+    def persist_edge(node, name)
+      return false unless PERSIST_METHODS.include?(name)
+
+      target =
+        case node.receiver
+        when Prism::ConstantReadNode, Prism::ConstantPathNode
+          self.class.const_string(node.receiver)
+        when Prism::CallNode
+          node.receiver.name.to_s # the association accessor, e.g. `orders`
+        end
+      return false unless target
+
+      add(node, "persists", target)
+      true
     end
 
     # Mailer.action(...).deliver_later / .deliver_now — a mail send. Record it as
@@ -150,14 +184,24 @@ module Lupa
       elsif name == "organize"
         each_const_arg(node) { |c| add(node, "organizes", c) }
       elsif ASSOCIATIONS.include?(name)
-        target = association_target(node)
-        add(node, "association", target) if target
+        record_association(node)
       elsif CALLBACK_METHODS.include?(name)
         each_symbol_arg(node) { |m| add(node, "triggers", m) }
       else
         return false
       end
       true
+    end
+
+    # Record the association as an edge (model -> target) and index the accessor
+    # name -> target so `persists` can resolve `x.<name>.create!` later.
+    def record_association(node)
+      target = association_target(node)
+      return unless target
+
+      add(node, "association", target)
+      aname = first_symbol_arg(node)
+      @associations << [aname.to_s, target] if aname
     end
 
     # An explicit `class_name:` wins over the naming convention (that guess is
