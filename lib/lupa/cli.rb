@@ -8,8 +8,6 @@ module Lupa
   # and shells out to the `sqlite3` binary for storage and queries (no sqlite3
   # gem dependency). The interesting logic lives in Extractor and Queries.
   class CLI
-    DB_RELATIVE = "tmp/lupa.db"
-
     DISPATCH = {
       "scan" => :scan, "query" => :query, "callers" => :callers,
       "calls" => :calls, "where" => :where, "stats" => :stats
@@ -44,17 +42,19 @@ module Lupa
     def where   = run_sql(Queries.where(fetch_arg))
 
     def scan
-      root = File.expand_path(@argv.shift || Dir.pwd)
-      db = File.join(root, DB_RELATIVE)
-      FileUtils.mkdir_p(File.dirname(db))
-
-      result = Extractor.call(root: root)
-      _out, err, status = Open3.capture3("sqlite3", db, stdin_data: SqlDump.call(result))
-      raise Error, "lupa: sqlite3 load failed: #{err}" unless status.success?
+      repo = Repo.new(@argv.shift || Dir.pwd)
+      result = Extractor.call(root: repo.root)
+      load_graph(repo.db, SqlDump.call(result))
 
       @out.puts "lupa: scanned #{result.scan_label} — " \
                 "nodes=#{result.nodes.size} edges=#{result.edges.size}"
-      @out.puts "lupa: graph written to #{db}"
+      @out.puts "lupa: graph written to #{repo.db}"
+    end
+
+    def load_graph(db, sql)
+      FileUtils.mkdir_p(File.dirname(db))
+      _out, err, status = Open3.capture3("sqlite3", db, stdin_data: sql)
+      raise Error, "lupa: sqlite3 load failed: #{err}" unless status.success?
     end
 
     def stats
@@ -71,7 +71,7 @@ module Lupa
     end
 
     def db_path
-      db = File.join(Dir.pwd, DB_RELATIVE)
+      db = Repo.new.db
       return db if File.exist?(db)
 
       raise Error, "lupa: no graph at #{db} — run 'lupa scan' in the repo first."
@@ -92,7 +92,7 @@ module Lupa
           lupa where NAME      where NAME is defined
           lupa stats           node/edge counts
 
-        The graph lives in <repo>/#{DB_RELATIVE}. Requires the sqlite3 binary.
+        The graph lives in <repo>/#{Repo::DB_RELATIVE}. Requires the sqlite3 binary.
       USAGE
     end
   end
