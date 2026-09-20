@@ -84,13 +84,6 @@ bundle install
 bundle exec rspec        # suite runs against spec/fixtures/repo, a tiny fake app
 ```
 
-The gem uses [Zeitwerk](https://github.com/fxn/zeitwerk) autoloading
-(`lib/lupa.rb`). The extractor is split into small, testable classes under `lib/lupa/`:
-`Walker` (per-file AST visit), `Extractor` (globbing + constant resolution),
-`SqlDump` (SQLite rendering), `Queries` (read SQL), and `CLI`. `exe/lupa` is the
-thin executable. Coverage is enforced at 90% via SimpleCov (the CLI's IO glue is
-filtered out); CI runs the suite on Ruby 3.3 and 3.4.
-
 ## License
 
 [MIT](LICENSE) © 2026 asccigcc
