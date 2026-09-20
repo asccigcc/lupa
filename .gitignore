@@ -1,4 +1,7 @@
 *.db
 *.sql
 tmp/
+coverage/
+.bundle/
+vendor/bundle/
 .DS_Store

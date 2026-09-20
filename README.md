@@ -1,5 +1,8 @@
 # lupa 🔍
 
+[![CI](https://github.com/asccigcc/lupa/actions/workflows/ci.yml/badge.svg)](https://github.com/asccigcc/lupa/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A static **code-interaction graph** for Ruby/Rails codebases, built for AI coding
 agents. It parses a repo with [Prism](https://github.com/ruby/prism) (no Rails
 boot, ~1s for a large app) and stores how classes connect in a small SQLite
@@ -62,3 +65,19 @@ is per-repo at `<repo>/tmp/lupa.db`; one install serves every project.
 - Rails/Ruby only; constant-based handoffs only (no runtime/metaprogrammed dispatch).
 - `association` targets are inferred from the symbol; `class_name:` is not read.
 - Ambiguous short constant names that can't be uniquely resolved are dropped.
+
+## Development
+
+```bash
+bundle install
+bundle exec rspec        # suite runs against spec/fixtures/repo, a tiny fake app
+```
+
+The extractor is split into small, testable classes under `lib/lupa/`:
+`Walker` (per-file AST visit), `Extractor` (globbing + constant resolution),
+`SqlDump` (SQLite rendering). `lib/lupa/extract.rb` is the thin CLI entrypoint.
+Coverage is enforced at 90% via SimpleCov; CI runs the suite on Ruby 3.3 and 3.4.
+
+## License
+
+[MIT](LICENSE) © 2026 asccigcc
