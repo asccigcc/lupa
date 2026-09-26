@@ -24,12 +24,23 @@ RSpec.describe Lupa::Resolver do
   end
 
   it "resolves persists through a unique association accessor, only onto models" do
-    expect(resolve("persists", "widgets", associations: [%w[widgets Widget]])).to eq(["Shop::Widget"])
+    expect(resolve("persists", "widgets", associations: [%w[widgets Widget X]])).to eq(["Shop::Widget"])
     expect(resolve("persists", "Checkout")).to be_empty
   end
 
   it "drops an accessor that maps to more than one model" do
-    expect(resolve("persists", "items", associations: [%w[items Order], %w[items Widget]])).to be_empty
+    expect(resolve("persists", "items", associations: [%w[items Order X], %w[items Widget X]])).to be_empty
+  end
+
+  it "looks an association target up from the owner's name, as Rails does" do
+    edge = Lupa::Edge.new(src: "Admin::Report", rel: "association", dst: "Order", line: 1)
+    expect(described_class.new(nodes, []).call([edge]).map(&:dst)).to eq(["Admin::Order"])
+  end
+
+  it "never records a class inheriting from itself (Pundit's `class Scope < Scope`)" do
+    scopes = %w[FooPolicy::Scope BarPolicy::Scope].map { |name| Lupa::Node.new(name, "policy", "p", 1) }
+    edge = Lupa::Edge.new(src: "FooPolicy::Scope", rel: "inherits", dst: "Scope", line: 1, nesting: %w[FooPolicy])
+    expect(described_class.new(scopes, []).call([edge])).to be_empty
   end
 
   it "de-duplicates identical resolved edges" do

@@ -5,7 +5,7 @@ module Lupa
   # rel declares (see Rel). Edges that can't be resolved are dropped.
   class Resolver
     # @param nodes [Array<Node>] every node in the repo, unique by name
-    # @param associations [Array<(String, String)>] accessor-name pairs from the walkers
+    # @param associations [Array<(String, String, String)>] [accessor, raw target, owner]
     def initialize(nodes, associations)
       @consts = ConstIndex.new(nodes)
       @accessors = AssociationIndex.new(associations, consts)
@@ -17,27 +17,44 @@ module Lupa
       edges.filter_map { |edge| resolve(edge) }.uniq
     end
 
+    # Rails' `compute_type` looks an association target up by the owner's
+    # *name* ("Shop::Widget" tries Shop::Widget::X, Shop::X, X), not by the
+    # lexical scope of the file that declares it.
+    # @return [Array<String>] owner's namespaces, innermost first
+    def self.owner_nesting(owner)
+      parts = owner.split("::")
+      parts.size.downto(1).map { |n| parts.first(n).join("::") }
+    end
+
     private
 
     attr_reader :consts, :accessors
 
     def resolve(edge)
-      target = send(Rel.resolution(edge.rel), edge.dst)
-      edge.with(dst: target) if target
+      target = send(Rel.resolution(edge.rel), edge)
+      edge.with(dst: target, nesting: []) if target
     end
 
-    def marker(dst)
-      dst
+    def marker(edge)
+      edge.dst
     end
 
-    def constant(dst)
-      consts.resolve(dst)
+    def constant(edge)
+      consts.resolve(edge.dst, edge.nesting)
+    end
+
+    def superclass(edge)
+      consts.resolve(edge.dst, edge.nesting, defining: edge.src)
+    end
+
+    def association(edge)
+      consts.resolve(edge.dst, Resolver.owner_nesting(edge.src))
     end
 
     # A model constant first, else the unique association target; kept only
     # when it lands on a model, so `SomeService.create` never leaks in.
-    def model(dst)
-      target = constant(dst) || accessors.resolve(dst)
+    def model(edge)
+      target = constant(edge) || accessors.resolve(edge.dst)
       target if consts.model?(target)
     end
   end

@@ -39,7 +39,7 @@ RSpec.describe Lupa::Walker do
   it "records associations and their accessor names" do
     walker = walk("class Widget < ApplicationRecord\n  has_many :parts\n  belongs_to :owner, class_name: 'User'\nend")
     expect(walker.edges.map(&:dst)).to eq(%w[ApplicationRecord Part User])
-    expect(walker.associations).to eq([%w[parts Part], %w[owner User]])
+    expect(walker.associations).to eq([%w[parts Part Widget], %w[owner User Widget]])
   end
 
   it "drops polymorphic associations" do

@@ -6,11 +6,11 @@ module Lupa
   # A name declared with conflicting targets across the app (`child` => both
   # Prescription and Delivery) resolves to nil rather than a guess.
   class AssociationIndex
-    # @param pairs [Array<(String, String)>] [accessor name, raw target constant]
-    # @param consts [ConstIndex] resolves each raw target
+    # @param pairs [Array<(String, String, String)>] [accessor name, raw target, owner]
+    # @param consts [ConstIndex] resolves each raw target from its owner's namespace
     def initialize(pairs, consts)
       @targets = pairs.group_by(&:first).transform_values do |named|
-        named.filter_map { |_, raw| consts.resolve(raw) }.uniq
+        named.filter_map { |_, raw, owner| consts.resolve(raw, Resolver.owner_nesting(owner)) }.uniq
       end
     end
 

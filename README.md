@@ -31,9 +31,11 @@ handoffs Rails actually uses.
 | `routes` | a `config/routes.rb` entry → the controller it points at (`route` node → controller) |
 
 **Trust model:** a resolved edge is recorded only when the receiver constant
-resolves to a class/module defined in the repo. Calls on local variables and
-`class_name:` overrides are **dropped, not guessed** — the graph under-reports
-rather than lies. Two rels are **markers**, not resolved edges: `dispatches`
+resolves to a class/module defined in the repo, looked up the way Ruby does:
+`::X` is top-level only, a bare name binds in the innermost enclosing
+`module`/`class` first (compact `class A::B` does not put `A` in scope), and
+association targets follow Rails' owner-name lookup. Calls on local variables
+are **dropped, not guessed** — the graph under-reports rather than lies. Two rels are **markers**, not resolved edges: `dispatches`
 (dynamic dispatch can't be resolved, so lupa records a signpost keyed on the
 receiver source, e.g. `dispatches → validate_action_class`, so the chain forks
 *visibly* instead of vanishing) and `triggers` (a lifecycle callback's target is
@@ -102,7 +104,10 @@ version manager ruby.
 - Rails/Ruby only; constant-based handoffs only (no runtime/metaprogrammed dispatch).
 - `association` targets honor an explicit `class_name:`, fall back to the naming
   convention otherwise, and drop `polymorphic: true` (no single target).
-- Ambiguous short constant names that can't be uniquely resolved are dropped.
+- A short constant name that isn't found lexically or at the top level is kept
+  only when it's unique app-wide; ambiguous ones are dropped. Lookup through a
+  class's *ancestors* isn't modeled, so Pundit's `class Scope < Scope` (which
+  Ruby resolves to `ApplicationPolicy::Scope`) is dropped rather than guessed.
 - `persists` resolves an association proxy by **name** (`orders` → `Order`), not by
   typing the receiver — so it can't tell two same-named associations apart and
   drops the name when it targets different models across the app. `new`/`build`

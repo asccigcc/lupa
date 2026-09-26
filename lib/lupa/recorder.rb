@@ -21,16 +21,17 @@ module Lupa
       nodes << Node.new(scope.current, kind, file, line)
     end
 
+    # @param nesting [Array<String>] lexical scope dst is looked up in
     # @return [true] so a recognizer can end with it to claim the call
-    def add(node, rel, dst)
-      edges << Edge.new(scope.current, rel, dst, node.location.start_line)
+    def add(node, rel, dst, nesting: scope.nesting)
+      edges << Edge.new(src: scope.current, rel:, dst:, line: node.location.start_line, nesting:)
       true
     end
 
     # @param name [String] an association accessor, e.g. "orders"
     # @param target [String] the raw constant it points at, e.g. "Order"
     def associate(name, target)
-      associations << [name, target]
+      associations << [name, target, scope.current]
     end
 
     # Marks a call node already represented by an enclosing edge (the `.welcome`

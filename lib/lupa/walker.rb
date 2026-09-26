@@ -58,9 +58,10 @@ module Lupa
       end
     end
 
+    # Ruby evaluates the superclass outside the class being opened.
     def record_superclass(superclass)
       parent = Ast.const_string(superclass)
-      recorder.add(superclass, "inherits", parent) if parent
+      recorder.add(superclass, "inherits", parent, nesting: scope.nesting.drop(1)) if parent
     end
 
     def record_call(node)

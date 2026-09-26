@@ -18,12 +18,19 @@ module Lupa
       CONSTANTS.any? { |type| node.is_a?(type) }
     end
 
-    # @return [String, nil] dotted constant path, e.g. "Api::FooController"
+    # @return [String, nil] dotted constant path, e.g. "Api::FooController";
+    #   a root-anchored `::Foo` keeps its prefix so it's never looked up lexically
     def const_string(node)
       case node
       when Prism::ConstantReadNode then node.name.to_s
-      when Prism::ConstantPathNode then [const_string(node.parent), node.name].compact.join("::")
+      when Prism::ConstantPathNode then const_path(node)
       end
+    end
+
+    def const_path(node)
+      return "::#{node.name}" unless node.parent
+
+      [const_string(node.parent), node.name].compact.join("::")
     end
 
     # @return [String, nil] the text of a string or symbol literal
