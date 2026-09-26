@@ -31,9 +31,9 @@ RSpec.describe Lupa::Queries do
     end
   end
 
-  describe ".quote" do
-    it "escapes single quotes to keep the SQL injection-safe" do
-      expect(described_class.quote("O'Brien")).to eq("'O''Brien'")
+  describe ".where with LIKE wildcards in the name" do
+    it "escapes _ and % so they match literally" do
+      expect(described_class.where("Foo_Bar%")).to include("LIKE '%::Foo\\_Bar\\%' ESCAPE '\\'")
     end
   end
 end

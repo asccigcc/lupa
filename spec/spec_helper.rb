@@ -3,7 +3,6 @@
 require "simplecov"
 SimpleCov.start do
   add_filter "/spec/"
-  add_filter "lib/lupa/cli.rb" # thin IO glue that shells out to sqlite3
   minimum_coverage 90
 end
 

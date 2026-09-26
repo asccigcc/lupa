@@ -13,22 +13,40 @@ module Lupa
       "calls" => :calls, "where" => :where, "stats" => :stats
     }.freeze
     HELP = [nil, "help", "-h", "--help"].freeze
+    USAGE = <<~USAGE.freeze
+      lupa — static code-interaction graph for AI agents.
 
+        lupa scan [PATH]     build/refresh the graph for a repo (default: cwd)
+        lupa query "SQL"     run a SQL query against the repo's graph
+        lupa callers NAME    who calls/enqueues/includes/inherits NAME
+        lupa calls NAME      what NAME calls/enqueues/organizes
+        lupa where NAME      where NAME is defined
+        lupa stats           node/edge counts
+
+      The graph lives in <repo>/#{Repo::DB_RELATIVE}. Requires the sqlite3 binary.
+    USAGE
+
+    # @param argv [Array<String>] command and arguments
+    # @param out [IO] where results go
+    # @param err [IO] where errors go
     def initialize(argv, out: $stdout, err: $stderr)
       @argv = argv.dup
       @out = out
       @err = err
     end
 
+    # @return [Integer] process exit status
     def run
-      send(command_for(@argv.shift))
+      send(command_for(argv.shift))
       0
     rescue Error => e
-      @err.puts(e.message)
+      err.puts(e.message)
       1
     end
 
     private
+
+    attr_reader :argv, :out, :err
 
     def command_for(command)
       return :help if HELP.include?(command)
@@ -42,32 +60,43 @@ module Lupa
     def where   = run_sql(Queries.where(fetch_arg))
 
     def scan
-      repo = Repo.new(@argv.shift || Dir.pwd)
-      result = Extractor.call(root: repo.root)
+      repo = Repo.new(argv.shift || Dir.pwd)
+      files = SourceFiles.new(repo.root)
+      result = Extractor.call(files:)
       load_graph(repo.db, SqlDump.call(result))
-
-      @out.puts "lupa: scanned #{result.scan_label} — " \
-                "nodes=#{result.nodes.size} edges=#{result.edges.size}"
-      @out.puts "lupa: graph written to #{repo.db}"
+      report_scan(files.label, result, repo.db)
     end
 
     def load_graph(db, sql)
       FileUtils.mkdir_p(File.dirname(db))
-      _out, err, status = Open3.capture3("sqlite3", db, stdin_data: sql)
-      raise Error, "lupa: sqlite3 load failed: #{err}" unless status.success?
+      sqlite(db, stdin: sql)
+    end
+
+    def report_scan(label, result, db)
+      out.puts "lupa: scanned #{label} — nodes=#{result.nodes.size} edges=#{result.edges.size}"
+      out.puts "lupa: skipped #{result.skipped.size} unparseable: #{result.skipped.join(", ")}" if result.skipped.any?
+      out.puts "lupa: graph written to #{db}"
     end
 
     def stats
-      @out.puts "nodes by kind:"
+      out.puts "nodes by kind:"
       run_sql(Queries.stats_nodes)
-      @out.puts
-      @out.puts "edges by rel:"
+      out.puts
+      out.puts "edges by rel:"
       run_sql(Queries.stats_edges)
     end
 
     def run_sql(sql)
-      system("sqlite3", "-column", "-header", db_path, sql) ||
-        raise(Error, "lupa: sqlite3 query failed (is the sqlite3 binary installed?)")
+      out.print(sqlite("-column", "-header", db_path, sql))
+    end
+
+    def sqlite(*, stdin: "")
+      stdout, stderr, status = Open3.capture3("sqlite3", *, stdin_data: stdin)
+      raise Error, "lupa: sqlite3 failed: #{stderr.strip}" unless status.success?
+
+      stdout
+    rescue Errno::ENOENT
+      raise Error, "lupa: the sqlite3 binary is not installed"
     end
 
     def db_path
@@ -78,22 +107,9 @@ module Lupa
     end
 
     def fetch_arg
-      @argv.shift || raise(Error, "lupa: this command needs a name argument")
+      argv.shift || raise(Error, "lupa: this command needs a name argument")
     end
 
-    def help
-      @out.puts <<~USAGE
-        lupa — static code-interaction graph for AI agents.
-
-          lupa scan [PATH]     build/refresh the graph for a repo (default: cwd)
-          lupa query "SQL"     run a SQL query against the repo's graph
-          lupa callers NAME    who calls/enqueues/includes/inherits NAME
-          lupa calls NAME      what NAME calls/enqueues/organizes
-          lupa where NAME      where NAME is defined
-          lupa stats           node/edge counts
-
-        The graph lives in <repo>/#{Repo::DB_RELATIVE}. Requires the sqlite3 binary.
-      USAGE
-    end
+    def help = out.puts(USAGE)
   end
 end

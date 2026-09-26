@@ -15,17 +15,19 @@ RSpec.describe Lupa::Extractor do
 
   describe "nodes" do
     it "records each defined class/module with an inferred kind" do
-      expect(node("ThingsController").kind).to eq("controller")
-      expect(node("DoThing").kind).to eq("interactor")
-      expect(node("NotifyJob").kind).to eq("job")
-      expect(node("Thing").kind).to eq("model")
-      expect(node("Trackable").kind).to eq("concern")
+      kinds = %w[ThingsController DoThing NotifyJob Thing Trackable].to_h { |name| [name, node(name).kind] }
+      expect(kinds).to eq("ThingsController" => "controller", "DoThing" => "interactor", "NotifyJob" => "job",
+                          "Thing" => "model", "Trackable" => "concern")
     end
 
     it "captures the defining file and line" do
       thing = node("Thing")
       expect(thing.file).to eq("app/models/thing.rb")
       expect(thing.line).to eq(3)
+    end
+
+    it "locates a class at its own file, not a nested file that reopens it" do
+      expect(node("Assemble").file).to eq("app/interactors/assemble.rb")
     end
 
     it "namespaces nested constants" do
@@ -239,8 +241,9 @@ RSpec.describe Lupa::Extractor do
       expect(Prism).to have_received(:parse).exactly(ruby_files.size).times
     end
 
-    it "skips a file that fails to parse" do
+    it "skips a file that fails to parse, and reports it" do
       expect(node("Broken")).to be_nil
+      expect(result.skipped).to eq(["app/models/broken.rb"])
     end
   end
 end

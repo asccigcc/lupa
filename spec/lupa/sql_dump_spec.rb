@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
 RSpec.describe Lupa::SqlDump do
+  subject(:sql) { described_class.call(result) }
+
   let(:result) do
     Struct.new(:nodes, :edges).new(
       [Lupa::Node.new("Thing", "model", "app/models/thing.rb", 3)],
       [Lupa::Edge.new("ThingsController", "calls", "DoThing", 5)]
     )
   end
-
-  subject(:sql) { described_class.call(result) }
 
   it "creates the nodes and edges tables" do
     expect(sql).to include("CREATE TABLE nodes (name TEXT PRIMARY KEY, kind TEXT, file TEXT, line INTEGER);")

@@ -34,10 +34,12 @@ Gem::Specification.new do |spec|
   spec.add_dependency "zeitwerk", "~> 2.6"
 
   spec.add_development_dependency "rspec", "~> 3.13"
+  spec.add_development_dependency "rubocop", "~> 1.60"
+  spec.add_development_dependency "rubocop-rspec", "~> 3.0"
   spec.add_development_dependency "simplecov", "~> 0.22"
 
   spec.metadata = {
-    "source_code_uri"       => spec.homepage,
+    "source_code_uri" => spec.homepage,
     "rubygems_mfa_required" => "true"
   }
 end

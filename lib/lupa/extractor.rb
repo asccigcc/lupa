@@ -6,136 +6,61 @@ module Lupa
   # Walks a repo and produces a resolved interaction graph.
   #
   #   result = Lupa::Extractor.call(root: "/path/to/repo")
-  #   result.nodes  # => [Node, ...]
-  #   result.edges  # => [Edge, ...]  (dst rewritten to a real node name)
+  #   result.nodes    # => [Node, ...]
+  #   result.edges    # => [Edge, ...]  (dst rewritten to a real node name)
+  #   result.skipped  # => ["app/models/broken.rb"]  (failed to parse)
   #
   # Only intra-repo edges survive: an edge is kept when its constant resolves to
-  # a node defined in the repo (exact full name, else a unique short name).
-  # Everything else is dropped rather than guessed.
+  # a node defined in the repo. Everything else is dropped rather than guessed.
   class Extractor
-    Result = Struct.new(:nodes, :edges, :scan_label)
+    Result = Data.define(:nodes, :edges, :skipped)
 
-    KIND_BY_DIR = {
-      "controllers" => "controller", "interactors" => "interactor",
-      "models" => "model", "jobs" => "job", "services" => "service",
-      "policies" => "policy", "mailers" => "mailer", "components" => "component",
-      "serializers" => "serializer"
-    }.freeze
-
-    SKIP = %r{/(vendor|node_modules|tmp|\.git|db/migrate|spec|test)/}
-
-    def self.call(root:)
-      new(root).call
+    # @param root [String] repo root (ignored when `files` is given)
+    # @param files [SourceFiles] which files to read
+    # @return [Result]
+    def self.call(root: nil, files: SourceFiles.new(root))
+      new(files).call
     end
 
-    def initialize(root)
-      @root = File.expand_path(root)
-      @scan_dir = File.directory?(File.join(@root, "app")) ? File.join(@root, "app") : @root
+    def initialize(files)
+      @files = files
+      @skipped = []
     end
 
+    # @return [Result]
     def call
-      walkers = walk(source_files) { |rel| Walker.new(file: rel, kind: kind_for(rel)) } +
-                walk(route_files) { |rel| RouteWalker.new(file: rel) }
+      walkers = walk_all
       nodes = walkers.flat_map(&:nodes).uniq(&:name)
-      edges = resolve(nodes, walkers.flat_map(&:edges), walkers.flat_map(&:associations))
-      Result.new(nodes, edges, relative(@scan_dir))
+      edges = Resolver.new(nodes, walkers.flat_map(&:associations)).call(walkers.flat_map(&:edges))
+      Result.new(nodes:, edges:, skipped:)
     end
 
     private
 
+    attr_reader :files, :skipped
+
+    def walk_all
+      walk(files.ruby_files) { |rel| Walker.new(file: rel) } +
+        walk(files.route_files) { |rel| RouteWalker.new(file: rel) }
+    end
+
     # Parses each path once and runs the walker built for it over the tree.
-    # Files that fail to parse are skipped rather than half-walked.
-    def walk(paths)
-      paths.filter_map do |path|
-        tree = Prism.parse(File.read(path))
-        next if tree.failure?
-
-        yield(relative(path)).tap { |walker| tree.value.accept(walker) }
-      end
+    # Files that fail to parse are skipped (and reported) rather than half-walked.
+    def walk(paths, &build)
+      paths.filter_map { |path| walk_file(path, &build) }
     end
 
-    # Match SKIP against the repo-relative path so the tool's own location
-    # (e.g. a checkout living under some .../spec/ tree) can't skip a target.
-    def source_files
-      Dir.glob(File.join(@scan_dir, "**", "*.rb")).sort.reject { |path| "/#{relative(path)}".match?(SKIP) }
+    def walk_file(path)
+      rel = files.relative(path)
+      tree = Prism.parse(File.read(path))
+      return skip(rel) if tree.failure?
+
+      yield(rel).tap { |walker| tree.value.accept(walker) }
     end
 
-    def relative(path)
-      path.delete_prefix("#{@root}/")
-    end
-
-    # Rails routes live outside app/ (which source_files scans), so pick them up
-    # explicitly: config/routes.rb plus any config/routes/*.rb split files.
-    def route_files
-      main = File.join(@root, "config", "routes.rb")
-      files = File.file?(main) ? [main] : []
-      files + Dir.glob(File.join(@root, "config", "routes", "*.rb")).sort
-    end
-
-    def kind_for(relpath)
-      segments = relpath.split("/")
-      KIND_BY_DIR.each { |dir, kind| return kind if segments.include?(dir) }
-      "other"
-    end
-
-    def resolve(nodes, edges, assoc_pairs)
-      by_full = {}
-      by_short = Hash.new { |h, k| h[k] = [] }
-      nodes.each do |n|
-        by_full[n.name] = n
-        by_short[n.name.split("::").last] << n.name
-      end
-      aidx = assoc_index(assoc_pairs, by_full, by_short)
-
-      edges.filter_map do |edge|
-        # `dispatches` targets are runtime-computed code and `triggers` targets
-        # are same-class method names — neither is a constant, so keep them
-        # verbatim rather than trying (and failing) to resolve them to a node.
-        next edge if %w[dispatches triggers].include?(edge.rel)
-
-        target = if edge.rel == "persists"
-                   resolve_persist(edge.dst, by_full, by_short, aidx)
-                 else
-                   resolve_const(edge.dst, by_full, by_short)
-                 end
-        next unless target
-
-        Edge.new(edge.src, edge.rel, target, edge.line)
-      end.uniq { |e| [e.src, e.rel, e.dst, e.line] }
-    end
-
-    # accessor name -> the model it targets, but only when unambiguous. A name
-    # declared with conflicting targets across the app (e.g. `child` => both
-    # Prescription and Delivery) is dropped rather than guessed.
-    def assoc_index(pairs, by_full, by_short)
-      idx = Hash.new { |h, k| h[k] = [] }
-      pairs.each do |name, raw|
-        target = resolve_const(raw, by_full, by_short)
-        idx[name] << target if target
-      end
-      idx.transform_values(&:uniq)
-    end
-
-    # A `persists` dst is either a model constant (`Widget.create!`) or an
-    # association accessor name (`x.widgets.create!`); resolve the constant first,
-    # else the unique association target. Kept only when it lands on a model, so
-    # `SomeService.create`-style writes on non-models don't leak in.
-    def resolve_persist(dst, by_full, by_short, aidx)
-      target = resolve_const(dst, by_full, by_short)
-      if target.nil?
-        candidates = aidx[dst]
-        target = candidates.first if candidates && candidates.size == 1
-      end
-      return unless target && by_full[target]&.kind == "model"
-
-      target
-    end
-
-    def resolve_const(const, by_full, by_short)
-      return const if by_full.key?(const)
-
-      candidates = by_short[const.split("::").last]
-      candidates.first if candidates.size == 1
+    def skip(rel)
+      skipped << rel
+      nil
     end
   end
 end

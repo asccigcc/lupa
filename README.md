@@ -118,6 +118,7 @@ version manager ruby.
 ```bash
 bundle install
 bundle exec rspec        # suite runs against spec/fixtures/repo, a tiny fake app
+bundle exec rubocop      # enforces the Sandi Metz sizing rules (see .rubocop.yml)
 ```
 
 ## License

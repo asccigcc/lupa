@@ -27,6 +27,13 @@ module Lupa
       "#{head}#{sep}#{singular_word(last)}"
     end
 
+    # Naive on purpose: only used to name a singular `resource`'s controller.
+    # @param word [String] e.g. "profile"
+    # @return [String] e.g. "profiles"
+    def pluralize(word)
+      word.end_with?("s") ? word : "#{word}s"
+    end
+
     # @param word [String] snake_case, e.g. "chart_note"
     # @return [String] e.g. "ChartNote"
     def camelize(word)
