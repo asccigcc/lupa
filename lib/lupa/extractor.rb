@@ -34,56 +34,38 @@ module Lupa
     end
 
     def call
-      nodes = []
-      raw_edges = []
-      assoc_pairs = []
-      each_file do |path, rel|
-        walker = Walker.new(file: rel, kind: kind_for(rel))
-        Prism.parse(File.read(path)).value.accept(walker)
-        nodes.concat(walker.nodes)
-        raw_edges.concat(walker.edges)
-        assoc_pairs.concat(walker.associations)
-      end
-
-      each_route_file do |path, rel|
-        walker = RouteWalker.new(file: rel)
-        Prism.parse(File.read(path)).value.accept(walker)
-        nodes.concat(walker.nodes)
-        raw_edges.concat(walker.edges)
-      end
-
-      nodes.uniq!(&:name)
-      Result.new(nodes, resolve(nodes, raw_edges, assoc_pairs), @scan_dir.delete_prefix("#{@root}/"))
+      walkers = walk(source_files) { |rel| Walker.new(file: rel, kind: kind_for(rel)) } +
+                walk(route_files) { |rel| RouteWalker.new(file: rel) }
+      nodes = walkers.flat_map(&:nodes).uniq(&:name)
+      edges = resolve(nodes, walkers.flat_map(&:edges), walkers.flat_map(&:associations))
+      Result.new(nodes, edges, relative(@scan_dir))
     end
 
     private
 
-    def each_file
-      Dir.glob(File.join(@scan_dir, "**", "*.rb")).sort.each do |path|
-        rel = path.delete_prefix("#{@root}/")
-        # Match SKIP against the repo-relative path so the tool's own location
-        # (e.g. a checkout living under some .../spec/ tree) can't skip a target.
-        next if "/#{rel}".match?(SKIP)
+    # Parses each path once and runs the walker built for it over the tree.
+    # Files that fail to parse are skipped rather than half-walked.
+    def walk(paths)
+      paths.filter_map do |path|
+        tree = Prism.parse(File.read(path))
+        next if tree.failure?
 
-        result = Prism.parse(File.read(path))
-        next if result.failure?
-
-        yield path, rel
+        yield(relative(path)).tap { |walker| tree.value.accept(walker) }
       end
     end
 
-    # Rails routes live outside app/ (which each_file scans), so pick them up
+    # Match SKIP against the repo-relative path so the tool's own location
+    # (e.g. a checkout living under some .../spec/ tree) can't skip a target.
+    def source_files
+      Dir.glob(File.join(@scan_dir, "**", "*.rb")).sort.reject { |path| "/#{relative(path)}".match?(SKIP) }
+    end
+
+    def relative(path)
+      path.delete_prefix("#{@root}/")
+    end
+
+    # Rails routes live outside app/ (which source_files scans), so pick them up
     # explicitly: config/routes.rb plus any config/routes/*.rb split files.
-    def each_route_file
-      route_files.each do |path|
-        rel = path.delete_prefix("#{@root}/")
-        result = Prism.parse(File.read(path))
-        next if result.failure?
-
-        yield path, rel
-      end
-    end
-
     def route_files
       main = File.join(@root, "config", "routes.rb")
       files = File.file?(main) ? [main] : []

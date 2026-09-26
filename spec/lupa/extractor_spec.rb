@@ -53,6 +53,11 @@ RSpec.describe Lupa::Extractor do
       expect(assoc).to contain_exactly("Widget", "Owner")
     end
 
+    it "singularizes irregular collection names and keeps singular names intact" do
+      assoc = edges(src: "Shipment", rel: "association").map(&:dst)
+      expect(assoc).to contain_exactly("Delivery", "Address", "Status", "Address")
+    end
+
     it "honors an explicit class_name: over the naming convention" do
       # belongs_to :main_widget, class_name: "Widget" -> Widget, never "MainWidget".
       expect(edges(src: "Owner", rel: "association", dst: "Widget")).not_to be_empty
@@ -153,6 +158,10 @@ RSpec.describe Lupa::Extractor do
       expect(edges(src: "DoThing", rel: "persists").map(&:dst)).to all(eq("Widget"))
     end
 
+    it "resolves a write through an irregular-plural association accessor" do
+      expect(edges(src: "ShipIt", rel: "persists", dst: "Delivery")).not_to be_empty
+    end
+
     it "drops a write verb on a non-model constant" do
       # NotifyJob.create -> a job, not a model -> filtered out of the write surface.
       expect(edges(src: "DoThing", rel: "persists", dst: "NotifyJob")).to be_empty
@@ -218,6 +227,20 @@ RSpec.describe Lupa::Extractor do
     it "drops an ambiguous short name with no exact match" do
       # Caller references bare `Dup`, defined as both A::Dup and B::Dup.
       expect(edges(src: "Caller")).to be_empty
+    end
+  end
+
+  describe "parsing" do
+    let(:ruby_files) { Dir.glob(File.join(FIXTURE_REPO, "{app,config}", "**", "*.rb")) }
+
+    it "parses each file exactly once" do
+      allow(Prism).to receive(:parse).and_call_original
+      result
+      expect(Prism).to have_received(:parse).exactly(ruby_files.size).times
+    end
+
+    it "skips a file that fails to parse" do
+      expect(node("Broken")).to be_nil
     end
   end
 end

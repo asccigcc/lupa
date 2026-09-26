@@ -10,6 +10,7 @@ module Lupa
     CALL_METHODS    = %w[call call!].freeze
     ENQUEUE_METHODS = %w[perform_later perform_async perform_now perform_in perform_at].freeze
     ASSOCIATIONS    = %w[has_many has_one belongs_to has_and_belongs_to_many].freeze
+    COLLECTIONS     = %w[has_many has_and_belongs_to_many].freeze
     DYNAMIC_METHODS = %w[constantize safe_constantize].freeze
     DELIVER_METHODS = %w[deliver_later deliver_now].freeze
 
@@ -72,12 +73,6 @@ module Lupa
       when Prism::ConstantPathNode
         [const_string(node.parent), node.name].compact.join("::")
       end
-    end
-
-    # Rough Rails classify: :chart_notes -> "ChartNote".
-    def self.classify(sym)
-      singular = sym.to_s.sub(/s\z/, "")
-      singular.split("_").map(&:capitalize).join
     end
 
     def visit_module_node(node)
@@ -206,14 +201,21 @@ module Lupa
 
     # An explicit `class_name:` wins over the naming convention (that guess is
     # wrong whenever the two differ). `polymorphic: true` has no single target,
-    # so drop it rather than invent one. Otherwise classify the association name.
+    # so drop it rather than invent one. Otherwise derive it from the name.
     def association_target(node)
       opts = keyword_args(node)
       return nil if opts["polymorphic"].is_a?(Prism::TrueNode)
       return const_literal(opts["class_name"]) if opts.key?("class_name")
 
       sym = first_symbol_arg(node)
-      self.class.classify(sym) if sym
+      conventional_class(node.name.to_s, sym.to_s) if sym
+    end
+
+    # Rails singularizes only collection names; belongs_to/has_one names are
+    # already singular, so `belongs_to :status` is Status, never "Statu".
+    def conventional_class(macro, name)
+      name = Inflector.singularize(name) if COLLECTIONS.include?(macro)
+      Inflector.camelize(name)
     end
 
     # Symbol-keyed keyword arguments of a call, as { "key" => value_node }.

@@ -28,6 +28,10 @@ module Lupa
       super()
     end
 
+    # Routes declare no model associations; kept so every walker answers the
+    # same messages (nodes / edges / associations) for Extractor.
+    def associations = []
+
     def visit_call_node(node)
       case node.name.to_s
       when "namespace"      then with_namespace(node) { super }
@@ -124,7 +128,7 @@ module Lupa
     end
 
     def camelize(str)
-      str.to_s.split("_").map(&:capitalize).join
+      Inflector.camelize(str)
     end
 
     # Naive singular -> plural for `resource`; good enough for controller naming.
