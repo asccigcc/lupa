@@ -4,11 +4,14 @@ module Lupa
   # The class/module definitions a walker is inside, as Ruby sees them.
   # `nesting` mirrors `Module.nesting` (innermost first): `module A; class B`
   # puts both A::B and A in scope, but compact `class A::B` puts only A::B.
-  # Both readers are cached because they're read once per call node.
+  # Both are cached because they're read once per call node. `file` is the
+  # repo-relative path being walked, stamped on every node and edge.
   class Scope
-    attr_reader :current, :nesting
+    attr_reader :file, :current, :nesting
 
-    def initialize
+    # @param file [String] repo-relative path of the file being walked
+    def initialize(file)
+      @file = file
       @frames = []
       refresh
     end

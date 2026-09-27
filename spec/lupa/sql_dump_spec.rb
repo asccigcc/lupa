@@ -6,13 +6,13 @@ RSpec.describe Lupa::SqlDump do
   let(:result) do
     Struct.new(:nodes, :edges).new(
       [Lupa::Node.new("Thing", "model", "app/models/thing.rb", 3)],
-      [Lupa::Edge.new("ThingsController", "calls", "DoThing", 5)]
+      [Lupa::Edge.new(src: "ThingsController", rel: "calls", dst: "DoThing", file: "app/c.rb", line: 5)]
     )
   end
 
   it "creates the nodes and edges tables" do
     expect(sql).to include("CREATE TABLE nodes (name TEXT PRIMARY KEY, kind TEXT, file TEXT, line INTEGER);")
-    expect(sql).to include("CREATE TABLE edges (src TEXT, rel TEXT, dst TEXT, line INTEGER);")
+    expect(sql).to include("CREATE TABLE edges (src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER);")
   end
 
   it "wraps the load in a single transaction" do
@@ -22,7 +22,7 @@ RSpec.describe Lupa::SqlDump do
 
   it "emits an insert per node and edge" do
     expect(sql).to include("INSERT OR IGNORE INTO nodes VALUES ('Thing', 'model', 'app/models/thing.rb', 3);")
-    expect(sql).to include("INSERT INTO edges VALUES ('ThingsController', 'calls', 'DoThing', 5);")
+    expect(sql).to include("INSERT INTO edges VALUES ('ThingsController', 'calls', 'DoThing', 'app/c.rb', 5);")
   end
 
   it "escapes single quotes to keep the SQL valid" do

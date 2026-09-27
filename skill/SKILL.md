@@ -1,6 +1,6 @@
 ---
 name: lupa
-description: Query a static code-interaction graph (SQLite) to trace how a Ruby/Rails codebase connects — which controller calls which interactor, organizer steps, model associations, job enqueues, includes, inheritance — instead of reading files. Use BEFORE grepping/reading to answer "what calls X", "what does X call", "where is X defined", or "impact radius of X". Triggers: tracing call chains, mapping controller→interactor/service flow, finding all callers of a class/job, understanding an unfamiliar Rails codebase.
+description: Query a static code-interaction graph (SQLite) to trace how a Ruby/Rails codebase connects — which controller calls which interactor, organizer steps, model associations, job enqueues, includes, inheritance — instead of reading files. Use BEFORE grepping/reading to answer "what calls X", "what does X call", "where is X defined", "impact radius of X", or "how does A reach B". Triggers: tracing call chains, mapping controller→interactor/service flow, finding all callers of a class/job, understanding an unfamiliar Rails codebase.
 ---
 
 # lupa
@@ -22,17 +22,25 @@ lupa scan            # run from the repo root; scans app/ if present, else whole
 
 ```bash
 lupa callers Order::Finalize     # who calls/enqueues/includes/inherits this (with file:line)
-lupa calls   CheckoutsController # what this class calls/enqueues/organizes, in order
+lupa calls   CheckoutsController # what this class calls/enqueues/organizes, with file:line
+lupa impact  CancelOrders        # everything one hop from it, in and out, with file:line
+lupa path    FromClass ToClass   # shortest chains of edges from one to the other (≤6 hops, ≤10 chains)
 lupa where   Order               # file:line where it's defined (matches namespaced too)
 lupa stats                       # node kinds + edge counts (sanity check the scan)
 lupa query   "SQL"               # arbitrary query against the schema below
 ```
 
+`path` follows edges in their direction and skips markers, so "no path" means
+no *static* chain — the real one may run through a `dispatches` fork or a
+runtime-chosen organizer step. Walk `calls`/`impact` out from the start to see where the static chain stops.
+
 ## Schema
 
 ```
 nodes(name TEXT PK, kind TEXT, file TEXT, line INTEGER)
-edges(src TEXT, rel TEXT, dst TEXT, line INTEGER)   -- src/dst are node names
+edges(src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER)
+-- src/dst are node names; file:line is where the edge was found (a reopened
+-- class can record edges outside the file that defines it)
 ```
 
 - `kind`: controller, interactor, model, job, service, policy, mailer,
@@ -72,13 +80,8 @@ edges(src TEXT, rel TEXT, dst TEXT, line INTEGER)   -- src/dst are node names
 ## Useful raw queries
 
 ```sql
--- Impact radius: everything one hop from X (in and out)
-SELECT 'out' dir, rel, dst other, line FROM edges WHERE src='X'
-UNION ALL
-SELECT 'in'  dir, rel, src other, line FROM edges WHERE dst='X';
-
 -- Full controller→interactor handoff map
-SELECT src, dst, line FROM edges WHERE rel='calls'
+SELECT src, dst, file, line FROM edges WHERE rel='calls'
   AND src IN (SELECT name FROM nodes WHERE kind='controller');
 
 -- Classes that include a concern

@@ -41,6 +41,12 @@ RSpec.describe Lupa::Extractor do
       expect(edges(src: "ThingsController", rel: "calls", dst: "DoThing")).not_to be_empty
     end
 
+    it "records the file each edge was found in, even for a reopened class" do
+      expect(edges(src: "Assemble", rel: "calls").map { |e| [e.file, e.line] })
+        .to eq([["app/interactors/assemble/step.rb", 6]])
+      expect(edges(src: "Assemble", rel: "organizes").map(&:file).uniq).to eq(["app/interactors/assemble.rb"])
+    end
+
     it "records perform_later as an `enqueues` edge" do
       expect(edges(src: "ThingsController", rel: "enqueues", dst: "NotifyJob")).not_to be_empty
     end

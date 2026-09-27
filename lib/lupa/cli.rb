@@ -10,7 +10,7 @@ module Lupa
   class CLI
     DISPATCH = {
       "scan" => :scan, "query" => :query, "callers" => :callers,
-      "calls" => :calls, "where" => :where, "stats" => :stats
+      "calls" => :calls, "impact" => :impact, "path" => :path, "where" => :where, "stats" => :stats
     }.freeze
     HELP = [nil, "help", "-h", "--help"].freeze
     USAGE = <<~USAGE.freeze
@@ -20,6 +20,8 @@ module Lupa
         lupa query "SQL"     run a SQL query against the repo's graph
         lupa callers NAME    who calls/enqueues/includes/inherits NAME
         lupa calls NAME      what NAME calls/enqueues/organizes
+        lupa impact NAME     everything one hop from NAME, in and out, with file:line
+        lupa path FROM TO    the shortest chains of edges from FROM to TO
         lupa where NAME      where NAME is defined
         lupa stats           node/edge counts
 
@@ -58,6 +60,19 @@ module Lupa
     def callers = run_sql(Queries.callers(fetch_arg))
     def calls   = run_sql(Queries.calls(fetch_arg))
     def where   = run_sql(Queries.where(fetch_arg))
+    def impact  = run_sql(Queries.impact(fetch_arg))
+
+    def path
+      from = fetch_arg
+      to = fetch_arg
+      trails = Path.new(edge_rows).between(from, to)
+      out.puts(trails.empty? ? "lupa: no path from #{from} to #{to} within #{Path::MAX_HOPS} hops" : trails)
+    end
+
+    # Tab-separated: node names and rels never contain a tab.
+    def edge_rows
+      sqlite("-separator", "\t", db_path, Queries.path_edges).lines(chomp: true).map { |row| row.split("\t") }
+    end
 
     def scan
       repo = Repo.new(argv.shift || Dir.pwd)

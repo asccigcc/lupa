@@ -5,14 +5,29 @@ RSpec.describe Lupa::Queries do
     it "selects incoming edges pointing at the name" do
       sql = described_class.callers("Order")
       expect(sql).to include("WHERE e.dst = 'Order'")
-      expect(sql).to include("JOIN nodes n ON n.name = e.src")
+      expect(sql).to include("JOIN nodes n ON n.name = e.src", "e.file || ':' || e.line AS at")
     end
   end
 
   describe ".calls" do
     it "selects outgoing edges from the name" do
       expect(described_class.calls("CheckoutsController"))
-        .to include("WHERE src = 'CheckoutsController'")
+        .to include("WHERE e.src = 'CheckoutsController'", "e.file || ':' || e.line AS at")
+    end
+  end
+
+  describe ".impact" do
+    it "unions incoming and outgoing edges with where each was found" do
+      sql = described_class.impact("Order")
+      expect(sql).to include("'in' AS dir", "'out'", "WHERE e.dst = 'Order'", "WHERE e.src = 'Order'")
+      expect(sql).to include("e.file || ':' || e.line AS at")
+    end
+  end
+
+  describe ".path_edges" do
+    it "selects distinct resolved edges, leaving out markers" do
+      expect(described_class.path_edges)
+        .to include("SELECT DISTINCT src, rel, dst FROM edges", "rel NOT IN ('dispatches', 'triggers')")
     end
   end
 

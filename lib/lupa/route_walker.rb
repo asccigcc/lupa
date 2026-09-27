@@ -108,7 +108,7 @@ module Lupa
 
       line = node.location.start_line
       nodes << Node.new(label, "route", file, line)
-      edges << Edge.new(label, "routes", controller, line)
+      edges << Edge.new(src: label, rel: "routes", dst: controller, file:, line:)
     end
   end
 end

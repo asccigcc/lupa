@@ -84,6 +84,8 @@ lupa scan                      # builds tmp/lupa.db (gitignored in most repos)
 lupa stats
 lupa callers Order::Finalize   # who calls it, with file:line
 lupa calls   CheckoutsController
+lupa impact  CancelOrders      # everything one hop away, in and out, with file:line
+lupa path    ChurnkeyController PartnerApiFillRequestJob   # shortest chains between two classes
 lupa where   Order
 lupa query   "SELECT ... FROM edges WHERE ..."
 ```

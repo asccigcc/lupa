@@ -7,8 +7,11 @@ module Lupa
   #
   # `nesting` is the lexical scope at the reference (see Scope#nesting). It only
   # feeds resolution; resolved edges carry an empty one.
-  Edge = Data.define(:src, :rel, :dst, :line, :nesting) do
-    def initialize(src:, rel:, dst:, line:, nesting: [])
+  #
+  # `file` is where the edge was found — not necessarily the file defining
+  # `src`, since a class can be reopened elsewhere.
+  Edge = Data.define(:src, :rel, :dst, :file, :line, :nesting) do
+    def initialize(src:, rel:, dst:, file:, line:, nesting: [])
       super
     end
   end

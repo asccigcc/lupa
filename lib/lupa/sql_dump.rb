@@ -10,7 +10,7 @@ module Lupa
       "DROP TABLE IF EXISTS nodes;",
       "DROP TABLE IF EXISTS edges;",
       "CREATE TABLE nodes (name TEXT PRIMARY KEY, kind TEXT, file TEXT, line INTEGER);",
-      "CREATE TABLE edges (src TEXT, rel TEXT, dst TEXT, line INTEGER);"
+      "CREATE TABLE edges (src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER);"
     ].freeze
 
     FOOTER = [
@@ -46,7 +46,7 @@ module Lupa
 
     def edge_inserts
       result.edges.map do |e|
-        "INSERT INTO edges VALUES (#{values(e.src, e.rel, e.dst)}, #{e.line});"
+        "INSERT INTO edges VALUES (#{values(e.src, e.rel, e.dst, e.file)}, #{e.line});"
       end
     end
 

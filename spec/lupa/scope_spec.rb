@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Lupa::Scope do
-  subject(:scope) { described_class.new }
+  subject(:scope) { described_class.new("app/x.rb") }
 
   def nesting_within(*names)
     return scope.nesting if names.empty?

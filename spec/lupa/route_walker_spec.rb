@@ -32,6 +32,12 @@ RSpec.describe Lupa::RouteWalker do
       .to eq([["DEVISE /patients/sessions", "Patients::SessionsController"]])
   end
 
+  it "records the routes file on each edge" do
+    walker = described_class.new(file: "config/routes/admin.rb")
+    Prism.parse("get 'a', to: 'pages#a'").value.accept(walker)
+    expect(walker.edges.map(&:file)).to eq(["config/routes/admin.rb"])
+  end
+
   it "skips a verb without a controller target" do
     expect(routes("get 'health'")).to be_empty
   end

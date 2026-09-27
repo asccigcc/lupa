@@ -50,6 +50,21 @@ RSpec.describe Lupa::CLI do
       expect(out.string).to include("ThingsController", "calls", "app/models/thing.rb")
     end
 
+    it "shows the impact radius in both directions with file:line" do
+      run("impact", "DoThing")
+      expect(out.string).to include("in ", "ThingsController", "app/controllers/things_controller.rb:", "out", "Widget")
+    end
+
+    it "prints the shortest chain between two classes" do
+      run("path", "ThingsController", "NotifyMailer")
+      expect(out.string).to include("ThingsController -calls-> DoThing -emails-> NotifyMailer")
+    end
+
+    it "says so when no chain connects them" do
+      expect(run("path", "NotifyMailer", "ThingsController")).to eq(0)
+      expect(out.string).to include("no path from NotifyMailer to ThingsController")
+    end
+
     it "prints stats by kind and rel" do
       run("stats")
       expect(out.string).to include("nodes by kind:", "edges by rel:", "persists")

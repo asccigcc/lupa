@@ -7,7 +7,7 @@ module Lupa
   class Recorder
     attr_reader :nodes, :edges, :associations
 
-    # @param scope [Scope] supplies the `src` of every node and edge
+    # @param scope [Scope] supplies the `src` and `file` of every node and edge
     def initialize(scope)
       @scope = scope
       @nodes = []
@@ -17,14 +17,14 @@ module Lupa
     end
 
     # Records the class/module the scope is currently inside.
-    def define(kind, file, line)
-      nodes << Node.new(scope.current, kind, file, line)
+    def define(kind, line)
+      nodes << Node.new(scope.current, kind, scope.file, line)
     end
 
     # @param nesting [Array<String>] lexical scope dst is looked up in
     # @return [true] so a recognizer can end with it to claim the call
     def add(node, rel, dst, nesting: scope.nesting)
-      edges << Edge.new(src: scope.current, rel:, dst:, line: node.location.start_line, nesting:)
+      edges << Edge.new(src: scope.current, rel:, dst:, file: scope.file, line: node.location.start_line, nesting:)
       true
     end
 

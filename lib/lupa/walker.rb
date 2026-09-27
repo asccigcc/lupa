@@ -25,9 +25,8 @@ module Lupa
     # @param kind [Kind] decides the kind of the classes/modules defined here
     def initialize(file:, kind: Kind.new(file))
       super()
-      @file = file
       @kind = kind
-      @scope = Scope.new
+      @scope = Scope.new(file)
       @recorder = Recorder.new(scope)
     end
 
@@ -49,11 +48,11 @@ module Lupa
 
     private
 
-    attr_reader :file, :kind, :scope, :recorder
+    attr_reader :kind, :scope, :recorder
 
     def define(node, node_kind)
       scope.within(Ast.const_string(node.constant_path)) do
-        recorder.define(node_kind, file, node.location.start_line)
+        recorder.define(node_kind, node.location.start_line)
         yield
       end
     end
