@@ -244,6 +244,10 @@ RSpec.describe Lupa::Extractor do
       expect(edges(src: "A::UsesDup", rel: "calls").map(&:dst)).to eq(["A::Dup"])
     end
 
+    it "resolves Pundit's `class Scope < Scope` through the policy's superclass" do
+      expect(edges(src: "ThingPolicy::Scope", rel: "inherits").map(&:dst)).to eq(["ApplicationPolicy::Scope"])
+    end
+
     it "drops a call whose constant is not defined in the repo" do
       expect(edges(src: "ThingsController", dst: "External::Api")).to be_empty
     end

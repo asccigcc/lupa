@@ -3,9 +3,10 @@
 module Lupa
   # Resolves a raw constant string to a node defined in the repo, following
   # Ruby's lookup: a root-anchored `::X` is top-level only; otherwise the first
-  # segment binds in the innermost enclosing namespace that defines it, then at
-  # the top level. Failing both, a *unique* short name is accepted. Ambiguous or
-  # unknown constants resolve to nil — dropped, never guessed.
+  # segment binds in the first scope that defines it (enclosing namespaces,
+  # then ancestors — see Hierarchy#scopes), then at the top level. Failing
+  # both, a *unique* short name is accepted. Ambiguous or unknown constants
+  # resolve to nil — dropped, never guessed.
   class ConstIndex
     # @param nodes [Array<Node>] unique by name
     def initialize(nodes)
@@ -15,7 +16,7 @@ module Lupa
     end
 
     # @param const [String] e.g. "Order", "Api::OrdersController" or "::Order"
-    # @param nesting [Array<String>] enclosing namespaces, innermost first
+    # @param nesting [Array<String>] scopes to search, in lookup order
     # @param defining [String, nil] a class whose superclass is being read; it
     #   doesn't exist yet at that point, so it can never be the answer
     # @return [String, nil] the resolved node name

@@ -33,7 +33,8 @@ handoffs Rails actually uses.
 **Trust model:** a resolved edge is recorded only when the receiver constant
 resolves to a class/module defined in the repo, looked up the way Ruby does:
 `::X` is top-level only, a bare name binds in the innermost enclosing
-`module`/`class` first (compact `class A::B` does not put `A` in scope), and
+`module`/`class` first (compact `class A::B` does not put `A` in scope), then
+in the superclass chain, and
 association targets follow Rails' owner-name lookup. Calls on local variables
 are **dropped, not guessed** — the graph under-reports rather than lies. Two rels are **markers**, not resolved edges: `dispatches`
 (dynamic dispatch can't be resolved, so lupa records a signpost keyed on the
@@ -106,10 +107,11 @@ version manager ruby.
 - Rails/Ruby only; constant-based handoffs only (no runtime/metaprogrammed dispatch).
 - `association` targets honor an explicit `class_name:`, fall back to the naming
   convention otherwise, and drop `polymorphic: true` (no single target).
-- A short constant name that isn't found lexically or at the top level is kept
-  only when it's unique app-wide; ambiguous ones are dropped. Lookup through a
-  class's *ancestors* isn't modeled, so Pundit's `class Scope < Scope` (which
-  Ruby resolves to `ApplicationPolicy::Scope`) is dropped rather than guessed.
+- Constant lookup follows the enclosing namespaces, then the innermost class's
+  *superclass* chain (so Pundit's `class Scope < Scope` resolves to
+  `ApplicationPolicy::Scope`), then the top level. Constants reached only
+  through an included module aren't followed. A short name found none of those
+  ways is kept only when it's unique app-wide; ambiguous ones are dropped.
 - `persists` resolves an association proxy by **name** (`orders` → `Order`), not by
   typing the receiver — so it can't tell two same-named associations apart and
   drops the name when it targets different models across the app. `new`/`build`

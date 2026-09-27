@@ -14,7 +14,8 @@ module Lupa
     # @param edges [Array<Edge>] raw edges
     # @return [Array<Edge>] resolved, de-duplicated edges
     def call(edges)
-      edges.filter_map { |edge| resolve(edge) }.uniq
+      hierarchy = Hierarchy.new(edges, consts)
+      edges.filter_map { |edge| resolve(edge, hierarchy.scopes(edge.nesting)) }.uniq
     end
 
     # Rails' `compute_type` looks an association target up by the owner's
@@ -30,31 +31,32 @@ module Lupa
 
     attr_reader :consts, :accessors
 
-    def resolve(edge)
-      target = send(Rel.resolution(edge.rel), edge)
+    # @param scopes [Array<String>] where dst is looked up (see Hierarchy#scopes)
+    def resolve(edge, scopes)
+      target = send(Rel.resolution(edge.rel), edge, scopes)
       edge.with(dst: target, nesting: []) if target
     end
 
-    def marker(edge)
+    def marker(edge, _scopes)
       edge.dst
     end
 
-    def constant(edge)
-      consts.resolve(edge.dst, edge.nesting)
+    def constant(edge, scopes)
+      consts.resolve(edge.dst, scopes)
     end
 
-    def superclass(edge)
-      consts.resolve(edge.dst, edge.nesting, defining: edge.src)
+    def superclass(edge, scopes)
+      consts.resolve(edge.dst, scopes, defining: edge.src)
     end
 
-    def association(edge)
+    def association(edge, _scopes)
       consts.resolve(edge.dst, Resolver.owner_nesting(edge.src))
     end
 
     # A model constant first, else the unique association target; kept only
     # when it lands on a model, so `SomeService.create` never leaks in.
-    def model(edge)
-      target = constant(edge) || accessors.resolve(edge.dst)
+    def model(edge, scopes)
+      target = constant(edge, scopes) || accessors.resolve(edge.dst)
       target if consts.model?(target)
     end
   end

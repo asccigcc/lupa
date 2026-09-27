@@ -92,7 +92,8 @@ SELECT src FROM edges WHERE rel='includes' AND dst='Trackable';
 
 lupa only records a resolved edge when the receiver constant resolves to a
 class/module defined in the repo, using Ruby's lexical lookup (`::X` is
-top-level; a bare name binds in the enclosing namespace first). Calls on local
+top-level; a bare name binds in the enclosing namespace, then the superclass
+chain, then the top level). Calls on local
 variables and ambiguous short constant names are **dropped, not guessed** — so the graph **under-reports
 rather than lies**. Treat a missing edge as "not statically resolvable," not
 "definitely absent." Dynamic constant dispatch is the exception: instead of

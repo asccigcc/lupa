@@ -45,6 +45,27 @@ RSpec.describe Lupa::Resolver do
     expect(described_class.new(scopes, []).call([edge])).to be_empty
   end
 
+  describe "through a class's ancestors" do
+    let(:nodes) do
+      %w[Client Braze::Base Braze::Base::Client Braze::Sms Braze::Sms::Local Braze::Base::Local]
+        .map { |name| Lupa::Node.new(name, "service", "f", 1) }
+    end
+
+    def resolved(dst)
+      edges = [Lupa::Edge.new(src: "Braze::Sms", rel: "inherits", dst: "Base", file: "f", line: 1, nesting: %w[Braze]),
+               Lupa::Edge.new(src: "Braze::Sms", rel: "calls", dst:, file: "f", line: 2, nesting: %w[Braze::Sms Braze])]
+      described_class.new(nodes, []).call(edges).map(&:dst).last
+    end
+
+    it "finds a constant in the superclass before the top level" do
+      expect(resolved("Client")).to eq("Braze::Base::Client")
+    end
+
+    it "still prefers the lexical scope over the superclass" do
+      expect(resolved("Local")).to eq("Braze::Sms::Local")
+    end
+  end
+
   it "de-duplicates identical resolved edges" do
     edges = Array.new(2) { Lupa::Edge.new(src: "X", rel: "calls", dst: "Order", file: "x.rb", line: 1) }
     expect(described_class.new(nodes, []).call(edges).size).to eq(1)
