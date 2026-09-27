@@ -24,11 +24,11 @@ from a specific line of code, and the graph records that `file:line`.
 
 ## Why
 
-When an AI agent traces a Rails request, it follows the path controller → interactor → job →
+When an AI agent traces a Rails request, it follows the path controller → service → job →
 mailer by grepping and opening file after file. That uses a lot of tokens and still misses
 steps. Generic indexers don't help much here. They see method calls, but not the Rails
-conventions that actually connect the code: organizer steps, `perform_later`, associations
-resolved by naming convention, `routes.rb`, and Pundit scopes.
+conventions that actually connect the code: `perform_later`, associations resolved by naming
+convention, `routes.rb`, and Pundit scopes.
 
 lupa records exactly those handoffs. It parses the code with
 [Prism](https://github.com/ruby/prism) and never boots the app, so there is no database, no
@@ -49,9 +49,8 @@ credentials and no environment setup. A scan of a large app takes about 1–2 se
 
 | rel | from → to |
 |-----|-----------|
-| `calls` | `SomeInteractor.call(...)` |
+| `calls` | `SomeService.call(...)` |
 | `enqueues` | `SomeJob.perform_later/async/...` |
-| `organizes` | `Interactor::Organizer` steps |
 | `invokes` | any other `SomeClass.class_method(...)` on a repo constant |
 | `persists` | a write (`create!`/`update`/`destroy`/…) on a model constant or an association proxy (`patient.orders.create!`) → the model |
 | `emails` | `SomeMailer.action(...).deliver_later/deliver_now` → the mailer |
