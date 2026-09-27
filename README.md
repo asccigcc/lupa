@@ -3,15 +3,47 @@
 [![CI](https://github.com/asccigcc/lupa/actions/workflows/ci.yml/badge.svg)](https://github.com/asccigcc/lupa/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A static **code-interaction graph** for Ruby/Rails codebases, built for AI coding
-agents. It parses a repo with [Prism](https://github.com/ruby/prism) (no Rails
-boot, ~1s for a large app) and stores how classes connect in a small SQLite
-database, so an agent can answer *"what calls X / what does X call / where is X
-defined"* with one query instead of reading dozens of files.
+lupa builds a static graph of how the classes in a **Rails** app connect and stores it in
+SQLite, so an agent can answer *"what calls X / what does X call / where is X defined"* with
+one query instead of reading dozens of files.
 
-It exists because generic tree-sitter indexers don't understand Rails, and
-reading files to trace call chains burns tokens. lupa is tuned to the constant-based
-handoffs Rails actually uses.
+## What it is
+
+lupa is a **static analysis** tool. It builds a **static call graph** extended with dependency
+edges, which is the kind of structure often called a **code knowledge graph**.
+
+- **Static analysis:** lupa reads the source code without running it. Prism parses each file
+  into an AST (abstract syntax tree), and lupa walks that tree.
+- **Call graph:** the nodes are the app's classes and modules, and the edges say who calls
+  whom. lupa's edges are *typed* (`calls`, `enqueues`, `association`, `inherits`, …), so the
+  graph shows the kind of each handoff as well as the fact that it happens.
+- **Knowledge graph:** the graph is stored as data you can query with SQL, not as a picture.
+
+lupa doesn't use NLP or embeddings. It doesn't search text by similarity. Every edge comes
+from a specific line of code, and the graph records that `file:line`.
+
+## Why
+
+When an AI agent traces a Rails request, it follows the path controller → interactor → job →
+mailer by grepping and opening file after file. That uses a lot of tokens and still misses
+steps. Generic indexers don't help much here. They see method calls, but not the Rails
+conventions that actually connect the code: organizer steps, `perform_later`, associations
+resolved by naming convention, `routes.rb`, and Pundit scopes.
+
+lupa records exactly those handoffs. It parses the code with
+[Prism](https://github.com/ruby/prism) and never boots the app, so there is no database, no
+credentials and no environment setup. A scan of a large app takes about 1–2 seconds.
+
+## Scope
+
+- **Rails only.** lupa assumes the Rails layout (`app/`, `config/routes.rb`) and its
+  conventions. It isn't a general Ruby indexer.
+- **Static and constant-based.** It captures a handoff when the target is a constant it can
+  resolve to a class defined in the repo.
+- **Precision over recall.** If lupa can't resolve a target, it drops the edge instead of
+  guessing. A missing edge means "not statically resolvable", not "doesn't happen".
+  Dynamic dispatch (`constantize`) is kept as a visible `dispatches` marker so you can see
+  where a chain forks.
 
 ## What it captures
 
@@ -30,58 +62,51 @@ handoffs Rails actually uses.
 | `triggers` | an AR lifecycle callback (`after_create_commit :notify`) → the method it runs (a marker, not a node) |
 | `routes` | a `config/routes.rb` entry → the controller it points at (`route` node → controller) |
 
-**Trust model:** a resolved edge is recorded only when the receiver constant
-resolves to a class/module defined in the repo, looked up the way Ruby does:
-`::X` is top-level only, a bare name binds in the innermost enclosing
-`module`/`class` first (compact `class A::B` does not put `A` in scope), then
-in the superclass chain, and
-association targets follow Rails' owner-name lookup. Calls on local variables
-are **dropped, not guessed** — the graph under-reports rather than lies. Two rels are **markers**, not resolved edges: `dispatches`
-(dynamic dispatch can't be resolved, so lupa records a signpost keyed on the
-receiver source, e.g. `dispatches → validate_action_class`, so the chain forks
-*visibly* instead of vanishing) and `triggers` (a lifecycle callback's target is
-a same-class method, not a constant, so `dst` is the method name — a lifecycle
-entry point you can see when you read the node, not a traversable node link).
+A few rules worth knowing:
 
-> `invokes` deliberately excludes the ActiveRecord query/persistence surface
-> (`find`, `where`, `create`, `new`, …) so business-logic class-method calls
-> aren't buried under a `Model.find` firehose. Scopes and custom class methods
-> are arbitrary names and *are* recorded. The *write* subset of that surface —
-> `create!`/`update`/`destroy`/… — is recovered separately as `persists` (below),
-> because it names a specific model being written: a real handoff, not query noise.
-
-> `persists` is how lupa follows a controller/service into a model without booting
-> Rails. It fires on a model constant (`Order.create!`) or an **association proxy**
-> (`patient.orders.create!` → `Order`, resolving `orders` through the app-wide
-> association graph). Reads (`find`/`where`) and `new`/`build` are excluded; an
-> ambiguous association name (one that targets different models in different
-> places, e.g. `child`) is dropped, not guessed; and the target must resolve to a
-> model, so `SomeService.create`-style writes on non-models never leak in.
+- `invokes` leaves out the ActiveRecord query surface (`find`, `where`, `new`, …) so real
+  business calls aren't buried under `Model.find`. Scopes and custom class methods are kept.
+- `persists` resolves an association proxy by its name across the app (`orders` → `Order`).
+  If the same name points at different models in different places, lupa drops it.
+- Constants are looked up the way Ruby does it. `::X` means top level only. Otherwise lupa
+  checks the enclosing namespaces first, then the superclass chain, then the top level.
+  Association targets follow Rails' own owner-based lookup.
 
 ## Install
 
-lupa is a gem. Clone and run the installer, which builds & installs the gem
-(putting `lupa` on PATH via RubyGems) and links the Claude skill into
-`~/.claude/skills`:
+Add it to the app's Gemfile. The `lupa` name on RubyGems belongs to an unrelated gem, so
+point Bundler at GitHub:
+
+```ruby
+group :development do
+  gem "lupa", github: "asccigcc/lupa", require: false
+end
+```
+
+```bash
+bundle install
+bundle exec lupa scan
+```
+
+To give Claude Code the bundled skill, link it:
+
+```bash
+ln -sfn "$(bundle info lupa --path)/skill" ~/.claude/skills/lupa
+```
+
+Or install lupa once for every repo on the machine. This installs the gem and links the skill:
 
 ```bash
 git clone git@github.com:asccigcc/lupa.git
 cd lupa && ./install.sh
 ```
 
-Or manage it yourself:
-
-```bash
-gem build lupa.gemspec && gem install ./lupa-*.gem   # just the CLI
-```
-
-Prereqs: **Ruby 3.3+** (Prism ships built in) and the **sqlite3** binary.
+Requires **Ruby 3.3+** and the **`sqlite3`** binary.
 
 ## Use
 
 ```bash
-cd /path/to/any/rails/repo
-lupa scan                      # builds tmp/lupa.db (gitignored in most repos)
+lupa scan                      # builds tmp/lupa.db
 lupa stats
 lupa callers Order::Finalize   # who calls it, with file:line
 lupa calls   CheckoutsController
@@ -91,43 +116,25 @@ lupa where   Order
 lupa query   "SELECT ... FROM edges WHERE ..."
 ```
 
-Once installed, the bundled Claude skill teaches Claude Code to reach for `lupa`
-before grepping/reading when tracing structure. See `skill/SKILL.md` for the
-full query cookbook and schema.
+The graph is stored per repo at `tmp/lupa.db`. See `skill/SKILL.md` for the schema and more
+example queries.
 
-## Portability
+## Limitations
 
-Clone on any machine, run `./install.sh`, then `lupa scan` in any repo. The graph
-is per-repo at `<repo>/tmp/lupa.db`; one install serves every project. The gem
-executable pins its own Ruby, so it works even inside repos that pin a different
-version manager ruby.
-
-## Limitations (it's young)
-
-- Rails/Ruby only; constant-based handoffs only (no runtime/metaprogrammed dispatch).
-- `association` targets honor an explicit `class_name:`, fall back to the naming
-  convention otherwise, and drop `polymorphic: true` (no single target).
-- Constant lookup follows the enclosing namespaces, then the innermost class's
-  *superclass* chain (so Pundit's `class Scope < Scope` resolves to
-  `ApplicationPolicy::Scope`), then the top level. Constants reached only
-  through an included module aren't followed. A short name found none of those
-  ways is kept only when it's unique app-wide; ambiguous ones are dropped.
-- `persists` resolves an association proxy by **name** (`orders` → `Order`), not by
-  typing the receiver — so it can't tell two same-named associations apart and
-  drops the name when it targets different models across the app. `new`/`build`
-  aren't counted as writes yet.
-- `routes` are parsed statically (no `rails routes` boot): explicit `to:`/hash-rocket
-  routes, `devise_for controllers:`, and `resources`/`resource` with
-  `namespace`/`scope module:` prefixing. The long tail — the individual REST paths
-  a `resources` expands to, `member`/`collection`, constraints, mounted engines —
-  is under-reported.
+- Calls on local variables and metaprogrammed dispatch aren't captured.
+- Constants that are reachable only through an included module aren't resolved.
+- `polymorphic: true` associations are dropped because they have no single target.
+- `new`/`build` followed by `save` isn't counted as a write yet.
+- Routes cover explicit `to:`, `devise_for controllers:` and `resources` with
+  `namespace`/`scope module:`. They don't yet cover the individual REST paths,
+  `member`/`collection`, constraints or mounted engines.
 
 ## Development
 
 ```bash
 bundle install
-bundle exec rspec        # suite runs against spec/fixtures/repo, a tiny fake app
-bundle exec rubocop      # enforces the Sandi Metz sizing rules (see .rubocop.yml)
+bundle exec rspec        # runs against spec/fixtures/repo, a tiny fake app
+bundle exec rubocop      # enforces the Sandi Metz sizing rules
 ```
 
 ## License
