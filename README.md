@@ -78,7 +78,7 @@ point Bundler at GitHub:
 
 ```ruby
 group :development do
-  gem "lupa", github: "asccigcc/lupa", require: false
+  gem "lupa", github: "asccigcc/lupa", tag: "v0.2.0", require: false
 end
 ```
 

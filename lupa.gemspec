@@ -6,11 +6,11 @@ Gem::Specification.new do |spec|
   spec.name        = "lupa"
   spec.version     = Lupa::VERSION
   spec.authors     = ["Pastorinni Ochoa"]
-  spec.summary     = "Static code-interaction graph for Ruby/Rails, built for AI agents."
+  spec.summary     = "Static code-interaction graph for Rails apps, built for AI agents."
   spec.description = <<~DESC
-    lupa parses a Ruby/Rails repo with Prism (no Rails boot) and stores how
-    classes connect — controller-to-interactor calls, organizer steps, model
-    associations, job enqueues, includes, inheritance — in a small SQLite graph,
+    lupa parses a Rails app with Prism (no Rails boot) and stores how
+    classes connect — service calls, job enqueues, mailer sends, model
+    associations, routes, includes, inheritance — in a small SQLite graph,
     so an agent can answer "what calls X / what does X call" with one query
     instead of reading files. Only statically-resolvable intra-repo edges are
     kept; unresolved dispatch is dropped, not guessed. Ships a Claude skill.
@@ -24,6 +24,7 @@ Gem::Specification.new do |spec|
     "exe/*",
     "skill/**/*",
     "LICENSE",
+    "CHANGELOG.md",
     "README.md"
   ]
   spec.bindir        = "exe"
