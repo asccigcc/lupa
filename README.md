@@ -59,7 +59,7 @@ credentials and no environment setup. A scan of a large app takes about 1–2 se
 | `inherits` | superclass |
 | `dispatches` | a `constantize` / `safe_constantize` fork — target computed at runtime |
 | `triggers` | an AR lifecycle callback (`after_create_commit :notify`) → the method it runs (a marker, not a node) |
-| `routes` | a `config/routes.rb` entry → the controller it points at (`route` node → controller) |
+| `routes` | a route (`GET /orders/:id #show`) → the controller it points at; `resources` expand into their REST actions |
 
 A few rules worth knowing:
 
@@ -124,9 +124,10 @@ example queries.
 - Constants that are reachable only through an included module aren't resolved.
 - `polymorphic: true` associations are dropped because they have no single target.
 - `new`/`build` followed by `save` isn't counted as a write yet.
-- Routes cover explicit `to:`, `devise_for controllers:` and `resources` with
-  `namespace`/`scope module:`. They don't yet cover the individual REST paths,
-  `member`/`collection`, constraints or mounted engines.
+- Edges are recorded per class, not per action. A route leads to its controller, and from
+  there `calls` lists what the whole controller calls, not only that action.
+- Routes don't cover constraints, `concern`s, mounted engines, or a namespace wrapped
+  around a `draw` call (each drawn file is read on its own).
 
 ## Development
 

@@ -18,6 +18,15 @@ module Lupa
       [/s\z/, ""]
     ].freeze
 
+    # Rails' plural rules, most specific first; a word already ending in s is kept.
+    PLURAL_RULES = [
+      [/(status|alias|bus)\z/, '\1es'],
+      [/(x|ch|sh|ss)\z/, '\1es'],
+      [/([^aeiouy]|qu)y\z/, '\1ies'],
+      [/s\z/, "s"],
+      [/\z/, "s"]
+    ].freeze
+
     module_function
 
     # @param word [String] snake_case, e.g. "chart_notes"
@@ -27,11 +36,12 @@ module Lupa
       "#{head}#{sep}#{singular_word(last)}"
     end
 
-    # Naive on purpose: only used to name a singular `resource`'s controller.
+    # Names a singular `resource`'s controller (`order_summary` -> `order_summaries`).
     # @param word [String] e.g. "profile"
     # @return [String] e.g. "profiles"
     def pluralize(word)
-      word.end_with?("s") ? word : "#{word}s"
+      head, sep, last = word.to_s.rpartition("_")
+      "#{head}#{sep}#{IRREGULAR.key(last) || apply_rule(last, PLURAL_RULES)}"
     end
 
     # @param word [String] snake_case, e.g. "chart_note"
@@ -43,11 +53,11 @@ module Lupa
     def singular_word(word)
       return word if UNCOUNTABLE.include?(word)
 
-      IRREGULAR.fetch(word) { apply_rule(word) }
+      IRREGULAR.fetch(word) { apply_rule(word, SINGULAR_RULES) }
     end
 
-    def apply_rule(word)
-      rule, replacement = SINGULAR_RULES.find { |pattern, _| word.match?(pattern) }
+    def apply_rule(word, rules)
+      rule, replacement = rules.find { |pattern, _| word.match?(pattern) }
       rule ? word.sub(rule, replacement) : word
     end
   end

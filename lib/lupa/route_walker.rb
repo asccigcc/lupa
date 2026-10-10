@@ -5,18 +5,21 @@ require "prism"
 module Lupa
   # Visits a parsed `config/routes*.rb` file, collecting `route` Nodes and
   # `routes` Edges whose `dst` is the (unresolved) controller constant a route
-  # points at. Resolution — and dropping routes to controllers not in the
-  # repo — is Resolver's job, same as every other edge.
+  # points at. A route's label carries its verb, path and action
+  # ("GET /widgets/:id #show"), since the edge itself only names the controller.
+  # Resolution — and dropping routes to controllers not in the repo — is
+  # Resolver's job, same as every other edge.
   #
   # Static only: we mirror Rails' own routing conventions rather than booting
   # the app for `rails routes`. So the long tail — constraints, mounted engines,
-  # `concern`s, implicit-controller `verb 'path'` — is under-reported, not lied
+  # `concern`s, `draw`n files' enclosing scope — is under-reported, not lied
   # about, consistent with the rest of lupa.
   class RouteWalker < Prism::Visitor
     HTTP_METHODS = %w[get post put patch delete match].freeze
     HANDLERS = {
       "namespace" => :visit_namespace, "scope" => :visit_scope, "devise_for" => :record_devise,
-      "resources" => :record_resource, "resource" => :record_resource
+      "resources" => :record_resource, "resource" => :record_resource, "root" => :record_root,
+      "member" => :visit_on, "collection" => :visit_on
     }.merge(HTTP_METHODS.to_h { |verb| [verb, :record_verb] }).freeze
 
     attr_reader :nodes, :edges
@@ -52,28 +55,49 @@ module Lupa
       scope.within(mod: name && Inflector.camelize(name), path: name, &)
     end
 
-    # scope module: :admin -> module only (a positional scope is a path prefix,
-    # which affects the label but not the controller constant we care about).
+    # scope module: :admin -> module only; scope "me" / scope path: "me" -> path only.
     def visit_scope(node, &)
-      mod = Ast.literal(Ast.keyword_args(node)["module"])
-      scope.within(mod: mod && Inflector.camelize(mod), &)
+      options = Ast.keyword_args(node)
+      mod = Ast.literal(options["module"])
+      path = Ast.first_literal(node) || Ast.literal(options["path"])
+      scope.within(mod: mod && Inflector.camelize(mod), path:, &)
     end
 
-    # get "p", to: "c#a" | get "p" => "c#a" (hash-rocket) | post "/p", to: "c#a"
+    # member do ... end / collection do ... end
+    def visit_on(node, &)
+      scope.on(node.name.to_s, &)
+    end
+
+    # get "p", to: "c#a" | get "p" => "c#a" | get :preview, on: :member (inside a resource)
     def record_verb(node)
-      path, target = verb_route(node)
-      add_route(label(node, path), target, node) if target
+      scope.on(Ast.literal(Ast.keyword_args(node)["on"])) do
+        path, target = verb_route(node)
+        add_route(label(node.name.to_s.upcase, path, target), target, node) if target
+      end
       yield
     end
 
     def verb_route(node)
       to = Ast.literal(Ast.keyword_args(node)["to"])
-      to ? [Ast.first_literal(node), to] : rocket_pair(node)
+      to ? [Ast.first_literal(node), to] : rocket_pair(node) || resource_action(node)
     end
 
     def rocket_pair(node)
       pairs = Ast.each_pair(Ast.args(node).last).map { |key, value| [Ast.literal(key), Ast.literal(value)] }
       pairs.find { |path, target| path && target&.include?("#") }
+    end
+
+    # Inside a resource, `get :preview` routes to that resource's own #preview.
+    def resource_action(node)
+      action = Ast.first_literal(node)
+      [action, "#{scope.resource.controller}##{action}"] if action && scope.resource
+    end
+
+    # root to: "pages#home" | root "pages#home"
+    def record_root(node)
+      target = Ast.literal(Ast.keyword_args(node)["to"]) || Ast.first_literal(node)
+      add_route(label("GET", "", target), target, node) if target
+      yield
     end
 
     # devise_for :patients, controllers: { registrations: "patients/registrations" }
@@ -85,21 +109,26 @@ module Lupa
       yield
     end
 
-    # resources :widgets | resource :profile | resources :x, controller: "y"
-    def record_resource(node)
+    # resources :widgets | resource :profile, with their REST routes, then the block
+    def record_resource(node, &)
       name = Ast.first_literal(node)
-      add_route(label(node, name), resource_controller(node, name), node) if name
-      yield
+      return yield unless name
+
+      resource = RouteResource.new(name, Ast.keyword_args(node), singular: node.name == :resource)
+      scope.within(mod: resource.mod) { record_rest(resource, node, &) }
     end
 
-    # A singular `resource` still routes to a plural controller.
-    def resource_controller(node, name)
-      override = Ast.literal(Ast.keyword_args(node)["controller"])
-      override || (node.name.to_s == "resource" ? Inflector.pluralize(name) : name)
+    def record_rest(resource, node, &)
+      resource.routes.each do |verb, path, action|
+        target = "#{resource.controller}##{action}"
+        add_route(label(verb, path, target), target, node)
+      end
+      scope.nest(resource, &)
     end
 
-    def label(node, path)
-      "#{node.name.to_s.upcase} /#{scope.path(path)}"
+    def label(verb, path, target)
+      action = target.to_s.split("#", 2).last if target.to_s.include?("#")
+      "#{verb} /#{scope.path(path)}#{" ##{action}" if action}"
     end
 
     def add_route(label, target, node)
