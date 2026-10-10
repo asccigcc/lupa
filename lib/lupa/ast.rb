@@ -38,6 +38,11 @@ module Lupa
       node.unescaped if LITERALS.any? { |type| node.is_a?(type) }
     end
 
+    # @return [Array<String>] one literal or an array of them (`only: [:a, :b]` -> a, b)
+    def literals(node)
+      node.is_a?(Prism::ArrayNode) ? node.elements.filter_map { |el| literal(el) } : [literal(node)].compact
+    end
+
     # @return [Boolean] whether node is a hash or keyword-hash literal
     def hash?(node)
       HASHES.any? { |type| node.is_a?(type) }

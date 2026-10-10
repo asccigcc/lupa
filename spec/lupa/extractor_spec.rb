@@ -179,11 +179,11 @@ RSpec.describe Lupa::Extractor do
   describe "routes" do
     it "records an explicit `to:` route as a `routes` edge to its controller" do
       srcs = edges(rel: "routes", dst: "ThingsController").map(&:src)
-      expect(srcs).to include("GET /things", "POST /things/bulk")
+      expect(srcs).to include("GET /things #index", "POST /things/bulk #bulk")
     end
 
     it "resolves the hash-rocket (verb => target) form" do
-      expect(edges(src: "GET /up", rel: "routes", dst: "ThingsController")).not_to be_empty
+      expect(edges(src: "GET /up #health", rel: "routes", dst: "ThingsController")).not_to be_empty
     end
 
     it "camelizes a namespaced controller path from devise_for" do
@@ -195,23 +195,23 @@ RSpec.describe Lupa::Extractor do
     end
 
     it "prefixes the controller module from `scope module:`" do
-      expect(edges(src: "PATCH /widgets/sync", rel: "routes", dst: "Admin::WidgetsController")).not_to be_empty
+      expect(edges(src: "PATCH /widgets/sync #sync", rel: "routes", dst: "Admin::WidgetsController")).not_to be_empty
     end
 
     it "treats a leading-slash `to:` as absolute, ignoring the module scope" do
-      expect(edges(src: "GET /abs", rel: "routes", dst: "ThingsController")).not_to be_empty
+      expect(edges(src: "GET /abs #abs", rel: "routes", dst: "ThingsController")).not_to be_empty
     end
 
     it "pluralizes a singular resource to name its controller" do
-      expect(edges(src: "RESOURCE /thing", rel: "routes", dst: "ThingsController")).not_to be_empty
+      expect(edges(src: "GET /thing #show", rel: "routes", dst: "ThingsController")).not_to be_empty
     end
 
     it "honors an explicit controller: override on a resource" do
-      expect(edges(src: "RESOURCES /gadgets", rel: "routes", dst: "ThingsController")).not_to be_empty
+      expect(edges(src: "GET /gadgets/:id #show", rel: "routes", dst: "ThingsController")).not_to be_empty
     end
 
     it "records the route itself as a node of kind route" do
-      expect(node("GET /things").kind).to eq("route")
+      expect(node("GET /things #index").kind).to eq("route")
     end
 
     it "drops a route whose controller is not defined in the repo" do

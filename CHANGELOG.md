@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `resources` and `resource` expand into their REST actions, honoring `only:`, `except:`,
+  `controller:`, `path:` and `module:`. Nested resources sit under the parent's
+  `:parent_id`, and `member`/`collection` routes are recorded, as a block or with `on:`.
+- `root` routes, and `scope "path"` / `scope path:` prefixes.
+
+### Changed
+
+- Route nodes are named `VERB /path #action` (e.g. `GET /orders/:id #show`), so the action
+  survives even though the edge only names the controller.
+
+### Fixed
+
+- `resources :x, only: []` no longer records a route.
+
 ## 0.2.0 — 2026-10-07
 
 The first tagged release.

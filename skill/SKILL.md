@@ -58,13 +58,18 @@ edges(src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER)
   — the mail-send analog of `enqueues`; the mailer-action call is recorded as
   this instead of a generic `invokes`), `includes`, `inherits`, `dispatches`,
   `triggers`, `routes`.
-- `routes` connects the HTTP layer to a controller: a `route` node (e.g.
-  `POST /things/bulk`, `DEVISE /patients/registrations`) → the controller it
-  targets. Start a trace from a URL/path here — `lupa callers SomeController`
-  lists the routes that reach it. Parsed statically, so it covers explicit
-  `to:`/hash-rocket routes, `devise_for controllers:`, and `resources`/`resource`
-  (with `namespace`/`scope module:` prefixing); it does **not** expand a
-  `resources` into its individual REST paths.
+- `routes` connects the HTTP layer to a controller. The `route` node is named
+  `VERB /path #action`, e.g. `GET /patients/:patient_id/orders/:id #show` or
+  `DEVISE /patients/registrations`, and the edge points at the controller.
+  Start a trace from a URL here: find the route with
+  `lupa query "SELECT src, dst FROM edges WHERE rel='routes' AND src LIKE '%/orders%'"`,
+  or list the routes that reach a controller with `lupa callers SomeController`.
+  `resources`/`resource` expand into their REST actions, honoring `only:`/`except:`,
+  `controller:`/`path:`/`module:`, nesting, and `member`/`collection` (block or
+  `on:`). Also covered: explicit `to:`/hash-rocket routes, `root`, `devise_for
+  controllers:`, `namespace` and `scope` (module and path).
+  Edges are per class, not per action. So `lupa calls SomeController` lists what
+  the whole controller calls; read the action's method to see what that one route does.
 - `dispatches` is special: a `constantize`/`safe_constantize` call whose target
   is computed at runtime. `dst` is **not a node** — it's the receiver source
   (e.g. `validate_action_class`), a signpost that the chain forks dynamically
