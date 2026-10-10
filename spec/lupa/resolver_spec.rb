@@ -20,6 +20,11 @@ RSpec.describe Lupa::Resolver do
     expect(resolve("calls", "Stripe")).to be_empty
   end
 
+  it "resolves a route target by its full name only, as Rails does" do
+    expect(resolve("routes", "Checkout")).to eq(["Checkout"])
+    expect(resolve("routes", "Widget")).to be_empty
+  end
+
   it "keeps markers verbatim" do
     expect(resolve("dispatches", "kind.name")).to eq(["kind.name"])
   end

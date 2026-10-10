@@ -126,8 +126,9 @@ example queries.
 - `new`/`build` followed by `save` isn't counted as a write yet.
 - Edges are recorded per class, not per action. A route leads to its controller, and from
   there `calls` lists what the whole controller calls, not only that action.
-- Routes don't cover constraints, `concern`s, mounted engines, or a namespace wrapped
-  around a `draw` call (each drawn file is read on its own).
+- Routes don't cover constraints, `concern`s, Devise's default routes (only the
+  `controllers:` overrides), or a namespace wrapped around a `draw` call (each drawn file is
+  read on its own). An engine's routes are recorded relative to where it's mounted.
 
 ## Development
 

@@ -70,6 +70,77 @@ RSpec.describe Lupa::RouteWalker do
     end
   end
 
+  describe "verbs without to:" do
+    it "route to the enclosing namespace's controller" do
+      expect(routes("namespace :formsort do\n  post 'answers'\nend\n" \
+                    "namespace :providers do\n  namespace :work_shifts do\n    post :toggle\n  end\nend"))
+        .to eq([["POST /formsort/answers #answers", "FormsortController"],
+                ["POST /providers/work_shifts/toggle #toggle", "Providers::WorkShiftsController"]])
+    end
+
+    it "read a slashed path as controller/action" do
+      expect(routes("post 'stripe/update'\npost '/x/y/z'\nget 'dash-ed/thing-x'"))
+        .to eq([["POST /stripe/update #update", "StripeController"], ["POST /x/y/z #z", "X::YController"],
+                ["GET /dash-ed/thing-x #thing_x", "DashEdController"]])
+    end
+
+    it "record one route per action when a call lists several" do
+      expect(labels("resource :insurance, only: [] do\n  collection do\n    get :card, :info\n  end\nend"))
+        .to eq(["GET /insurance/card #card", "GET /insurance/info #info"])
+    end
+
+    it "honor action: and controller:" do
+      expect(routes("namespace :ic do\n  post 'pb', controller: '/intercom', action: :cps\nend\n" \
+                    "get 'ctl', controller: :foo\n" \
+                    "resource :renewal_payment, only: [] do\n  get :setup_intent, action: :card_setup_intent\nend"))
+        .to eq([["POST /ic/pb #cps", "IntercomController"], ["GET /ctl #ctl", "FooController"],
+                ["GET /renewal_payment/setup_intent #card_setup_intent", "RenewalPaymentsController"]])
+    end
+
+    it "use the controller set by scope controller: or a controller block" do
+      expect(routes("scope controller: :pages do\n  get 'about'\nend\ncontroller :help do\n  get 'faq'\nend"))
+        .to eq([["GET /about #about", "PagesController"], ["GET /faq #faq", "HelpController"]])
+    end
+
+    it "keep the resource's controller inside a nested namespace or scope module:" do
+      expect(routes("resources :orders, only: [] do\n  scope module: :orders do\n    " \
+                    "resource :product_category, only: :update\n  end\nend"))
+        .to eq([["PATCH /orders/:order_id/product_category #update", "Orders::ProductCategoriesController"],
+                ["PUT /orders/:order_id/product_category #update", "Orders::ProductCategoriesController"]])
+    end
+  end
+
+  it "drops a verb whose to: is not a controller#action (redirect, proc, rack app)" do
+    expect(routes("namespace :admin do\n  get 'foo', to: redirect('/bar')\n  " \
+                  "get 'pr', to: proc { [204, {}, []] }\nend")).to be_empty
+  end
+
+  it "ignores a concern's body, which only becomes routes where concerns: names it" do
+    expect(routes("namespace :shop do\n  concern :commentable do\n    get 'comments'\n  end\nend")).to be_empty
+  end
+
+  describe "root" do
+    it "honors controller: and action:" do
+      expect(routes("namespace :pnv do\n  root controller: '/phone_number_verifications', action: :new\nend"))
+        .to eq([["GET /pnv #new", "PhoneNumberVerificationsController"]])
+    end
+
+    it "is dropped when it redirects instead of naming a controller" do
+      expect(routes("namespace :dev do\n  root to: redirect('/api-docs')\nend")).to be_empty
+    end
+  end
+
+  it "records a match route once per via: verb" do
+    expect(labels("match 'sig', to: 'info#sig', via: [:get, :post]\nmatch 'all', to: 'info#all', via: :all"))
+      .to eq(["GET /sig #sig", "POST /sig #sig", "ANY /all #all"])
+  end
+
+  it "prefixes an engine's own draw block with the engine's module" do
+    walker = described_class.new(file: "config/routes.rb")
+    Prism.parse("Shop::Engine.routes.draw do\n  resources :carts, only: :index\nend").value.accept(walker)
+    expect(walker.edges.map { |e| [e.src, e.dst] }).to eq([["GET /carts #index", "Shop::CartsController"]])
+  end
+
   it "routes verbs with to: and hash-rocket targets" do
     expect(routes("get 'a', to: 'pages#a'\npost 'b' => 'pages#b'"))
       .to eq([["GET /a #a", "PagesController"], ["POST /b #b", "PagesController"]])

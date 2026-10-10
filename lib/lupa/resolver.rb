@@ -53,6 +53,12 @@ module Lupa
       consts.resolve(edge.dst, Resolver.owner_nesting(edge.src))
     end
 
+    # Rails builds the full controller name from the route's modules, so a
+    # short-name match would point at a controller Rails never reaches.
+    def route(edge, _scopes)
+      consts.resolve("::#{edge.dst}")
+    end
+
     # A model constant first, else the unique association target; kept only
     # when it lands on a model, so `SomeService.create` never leaks in.
     def model(edge, scopes)
