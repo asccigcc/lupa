@@ -9,17 +9,19 @@ module Lupa
   #               and the edge survives only if it lands on a model.
   # - :superclass — a constant read before the class being defined exists.
   # - :association — a constant looked up from the owning class's name, as Rails does.
+  # - :route    — a controller Rails names in full; an exact match or nothing.
   # - :constant — everything else; a constant resolved in its lexical scope.
   module Rel
     RESOLUTION = {
       "dispatches" => :marker, "triggers" => :marker, "persists" => :model, "association" => :association,
-      "inherits" => :superclass
+      "inherits" => :superclass,
+      "routes" => :route
     }.freeze
 
     module_function
 
     # @param rel [String] e.g. "calls"
-    # @return [Symbol] :marker, :model, :superclass, :association or :constant
+    # @return [Symbol] :marker, :model, :superclass, :association, :route or :constant
     def resolution(rel)
       RESOLUTION.fetch(rel, :constant)
     end

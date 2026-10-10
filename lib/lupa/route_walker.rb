@@ -11,15 +11,16 @@ module Lupa
   # Resolver's job, same as every other edge.
   #
   # Static only: we mirror Rails' own routing conventions rather than booting
-  # the app for `rails routes`. So the long tail — constraints, mounted engines,
-  # `concern`s, `draw`n files' enclosing scope — is under-reported, not lied
-  # about, consistent with the rest of lupa.
+  # the app for `rails routes`. So the long tail — constraints, `concern`s,
+  # Devise's default routes, `draw`n files' enclosing scope — is under-reported,
+  # not lied about, consistent with the rest of lupa.
   class RouteWalker < Prism::Visitor
     HTTP_METHODS = %w[get post put patch delete match].freeze
     HANDLERS = {
       "namespace" => :visit_namespace, "scope" => :visit_scope, "devise_for" => :record_devise,
       "resources" => :record_resource, "resource" => :record_resource, "root" => :record_root,
-      "member" => :visit_on, "collection" => :visit_on
+      "member" => :visit_on, "collection" => :visit_on, "controller" => :visit_controller, "draw" => :visit_draw,
+      "concern" => :skip_concern
     }.merge(HTTP_METHODS.to_h { |verb| [verb, :record_verb] }).freeze
 
     attr_reader :nodes, :edges
@@ -55,47 +56,58 @@ module Lupa
       scope.within(mod: name && Inflector.camelize(name), path: name, &)
     end
 
-    # scope module: :admin -> module only; scope "me" / scope path: "me" -> path only.
+    # scope module: :admin -> module only; scope "me" / scope path: "me" -> path
+    # only; scope controller: :pages -> the default controller only.
     def visit_scope(node, &)
-      options = Ast.keyword_args(node)
-      mod = Ast.literal(options["module"])
-      path = Ast.first_literal(node) || Ast.literal(options["path"])
-      scope.within(mod: mod && Inflector.camelize(mod), path:, &)
+      options = Ast.keyword_args(node).transform_values { Ast.literal(_1) }
+      mod = options["module"] && Inflector.camelize(options["module"])
+      scope.within(mod:, path: Ast.first_literal(node) || options["path"], controller: options["controller"], &)
     end
+
+    # controller :pages do ... end
+    def visit_controller(node, &)
+      scope.within(controller: Ast.first_literal(node), &)
+    end
+
+    # An engine's controllers live under its module (`isolate_namespace`, the
+    # engine norm): Shop::Engine.routes.draw -> Shop::. The app's own draw, and
+    # `draw :file`, add nothing.
+    def visit_draw(node, &)
+      scope.within(mod: engine_module(node.receiver), &)
+    end
+
+    def engine_module(receiver)
+      engine = Ast.const_string(receiver.receiver) if Ast.call?(receiver)
+      engine.delete_suffix("::Engine") if engine&.end_with?("::Engine")
+    end
+
+    # A `concern` body is a template: it declares nothing until a `concerns:`
+    # names it, where the enclosing scope differs. Skipping the subtree keeps us
+    # from attributing its verbs to the scope the concern is *defined* in.
+    def skip_concern(_node); end
 
     # member do ... end / collection do ... end
     def visit_on(node, &)
       scope.on(node.name.to_s, &)
     end
 
-    # get "p", to: "c#a" | get "p" => "c#a" | get :preview, on: :member (inside a resource)
+    # get "p", to: "c#a" | get "p" => "c#a" | get :preview, on: :member | post "stripe/update"
     def record_verb(node)
-      scope.on(Ast.literal(Ast.keyword_args(node)["on"])) do
-        path, target = verb_route(node)
-        add_route(label(node.name.to_s.upcase, path, target), target, node) if target
-      end
+      scope.on(Ast.literal(Ast.keyword_args(node)["on"])) { record_verb_routes(node) }
       yield
     end
 
-    def verb_route(node)
-      to = Ast.literal(Ast.keyword_args(node)["to"])
-      to ? [Ast.first_literal(node), to] : rocket_pair(node) || resource_action(node)
+    def record_verb_routes(node)
+      RouteVerb.new(node, default: scope.default_controller).routes.each do |verb, path, target|
+        add_route(label(verb, path, target), target, node)
+      end
     end
 
-    def rocket_pair(node)
-      pairs = Ast.each_pair(Ast.args(node).last).map { |key, value| [Ast.literal(key), Ast.literal(value)] }
-      pairs.find { |path, target| path && target&.include?("#") }
-    end
-
-    # Inside a resource, `get :preview` routes to that resource's own #preview.
-    def resource_action(node)
-      action = Ast.first_literal(node)
-      [action, "#{scope.resource.controller}##{action}"] if action && scope.resource
-    end
-
-    # root to: "pages#home" | root "pages#home"
+    # root to: "pages#home" | root "pages#home" | root controller: "x", action: :y
     def record_root(node)
-      target = Ast.literal(Ast.keyword_args(node)["to"]) || Ast.first_literal(node)
+      options = Ast.keyword_args(node)
+      target = Ast.literal(options["to"]) || Ast.first_literal(node) ||
+               RouteTarget.new(nil, options, default: scope.default_controller).to_s
       add_route(label("GET", "", target), target, node) if target
       yield
     end
