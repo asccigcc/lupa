@@ -15,6 +15,18 @@ RSpec.describe Lupa::Inflector do
     end
   end
 
+  describe ".pluralize" do
+    {
+      "profile" => "profiles", "order_summary" => "order_summaries", "product_category" => "product_categories",
+      "day" => "days", "box" => "boxes", "batch" => "batches", "address" => "addresses",
+      "status" => "statuses", "person" => "people", "settings" => "settings"
+    }.each do |singular, plural|
+      it "#{singular} -> #{plural}" do
+        expect(described_class.pluralize(singular)).to eq(plural)
+      end
+    end
+  end
+
   describe ".camelize" do
     it "camel-cases a snake_case word" do
       expect(described_class.camelize("chart_note")).to eq("ChartNote")
