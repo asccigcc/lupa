@@ -8,6 +8,11 @@
   `controller:`, `path:` and `module:`. Nested resources sit under the parent's
   `:parent_id`, and `member`/`collection` routes are recorded, as a block or with `on:`.
 - `root` routes, and `scope "path"` / `scope path:` prefixes.
+- Verbs without `to:` follow Rails' rules: a slashed path reads as controller/action
+  (`post "stripe/update"`), a plain one routes to the enclosing namespace's controller, and
+  `action:`, `controller:`, `scope controller:` and `controller :x do` are honored.
+- `get :a, :b` records one route per action, and `match ... via:` one route per verb.
+- An engine's own `X::Engine.routes.draw` block routes to controllers under `X::`.
 
 ### Changed
 
@@ -17,6 +22,8 @@
 ### Fixed
 
 - `resources :x, only: []` no longer records a route.
+- A route only reaches the controller Rails names in full. It no longer falls back to a
+  unique short name, which pointed `rails/health#show` at `Api::V1::HealthController`.
 
 ## 0.2.0 — 2026-10-07
 
