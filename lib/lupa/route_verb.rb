@@ -13,9 +13,9 @@ module Lupa
       @options = Ast.keyword_args(node)
     end
 
-    # @return [Array<Array(String, String, String)>] [verb, path, target] per route
+    # @return [Array<Route>] one per path and per verb the call declares
     def routes
-      targets.product(verbs).map { |(path, target), verb| [verb, path, target] }
+      targets.product(verbs).map { |(path, target), verb| Route.new(verb:, path:, target:) }
     end
 
     private

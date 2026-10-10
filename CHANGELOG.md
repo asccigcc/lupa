@@ -29,6 +29,8 @@
   instead of reading an action off the path and pairing it with the enclosing namespace.
 - A `concern` body is skipped. Its verbs belong to wherever `concerns:` names it, not to the
   scope the concern is defined in.
+- A `devise_for` inside a `namespace` or `scope` labels its routes with that path prefix, like
+  every other route.
 
 ## 0.2.0 — 2026-10-07
 
