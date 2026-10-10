@@ -19,7 +19,8 @@ module Lupa
     HANDLERS = {
       "namespace" => :visit_namespace, "scope" => :visit_scope, "devise_for" => :record_devise,
       "resources" => :record_resource, "resource" => :record_resource, "root" => :record_root,
-      "member" => :visit_on, "collection" => :visit_on, "controller" => :visit_controller, "draw" => :visit_draw
+      "member" => :visit_on, "collection" => :visit_on, "controller" => :visit_controller, "draw" => :visit_draw,
+      "concern" => :skip_concern
     }.merge(HTTP_METHODS.to_h { |verb| [verb, :record_verb] }).freeze
 
     attr_reader :nodes, :edges
@@ -80,6 +81,11 @@ module Lupa
       engine.delete_suffix("::Engine") if engine&.end_with?("::Engine")
     end
 
+    # A `concern` body is a template: it declares nothing until a `concerns:`
+    # names it, where the enclosing scope differs. Skipping the subtree keeps us
+    # from attributing its verbs to the scope the concern is *defined* in.
+    def skip_concern(_node); end
+
     # member do ... end / collection do ... end
     def visit_on(node, &)
       scope.on(node.name.to_s, &)
@@ -97,9 +103,11 @@ module Lupa
       end
     end
 
-    # root to: "pages#home" | root "pages#home"
+    # root to: "pages#home" | root "pages#home" | root controller: "x", action: :y
     def record_root(node)
-      target = Ast.literal(Ast.keyword_args(node)["to"]) || Ast.first_literal(node)
+      options = Ast.keyword_args(node)
+      target = Ast.literal(options["to"]) || Ast.first_literal(node) ||
+               RouteTarget.new(nil, options, default: scope.default_controller).to_s
       add_route(label("GET", "", target), target, node) if target
       yield
     end

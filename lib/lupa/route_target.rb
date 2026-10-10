@@ -6,6 +6,10 @@ module Lupa
   # reads as controller/action (`post "stripe/update"` -> stripe#update); else
   # the path names an action on the enclosing controller (a resource's, a
   # `scope controller:`'s, or — left empty — the namespace's own).
+  #
+  # A `to:` that isn't a "controller#action" string routes somewhere we can't
+  # name — a redirect, a proc, a mounted Rack app — so the route is dropped
+  # rather than read off the path, which would invent the enclosing controller.
   class RouteTarget
     SHORTHAND = %r{\A/?[-\w]+/[-\w/]+\z}
     ACTION = /\A[-\w]+\z/
@@ -24,8 +28,9 @@ module Lupa
     def to_s
       to = option("to")
       return to if to&.include?("#")
+      return if options.key?("to")
 
-      "#{controller}##{to || action}" if to || action
+      "#{controller}##{action}" if action
     end
 
     private

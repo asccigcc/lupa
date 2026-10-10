@@ -110,6 +110,26 @@ RSpec.describe Lupa::RouteWalker do
     end
   end
 
+  it "drops a verb whose to: is not a controller#action (redirect, proc, rack app)" do
+    expect(routes("namespace :admin do\n  get 'foo', to: redirect('/bar')\n  " \
+                  "get 'pr', to: proc { [204, {}, []] }\nend")).to be_empty
+  end
+
+  it "ignores a concern's body, which only becomes routes where concerns: names it" do
+    expect(routes("namespace :shop do\n  concern :commentable do\n    get 'comments'\n  end\nend")).to be_empty
+  end
+
+  describe "root" do
+    it "honors controller: and action:" do
+      expect(routes("namespace :pnv do\n  root controller: '/phone_number_verifications', action: :new\nend"))
+        .to eq([["GET /pnv #new", "PhoneNumberVerificationsController"]])
+    end
+
+    it "is dropped when it redirects instead of naming a controller" do
+      expect(routes("namespace :dev do\n  root to: redirect('/api-docs')\nend")).to be_empty
+    end
+  end
+
   it "records a match route once per via: verb" do
     expect(labels("match 'sig', to: 'info#sig', via: [:get, :post]\nmatch 'all', to: 'info#all', via: :all"))
       .to eq(["GET /sig #sig", "POST /sig #sig", "ANY /all #all"])
