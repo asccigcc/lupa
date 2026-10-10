@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 class Owner < ApplicationRecord
+  # a devise scope: makes `current_owner` resolve to Owner app-wide
+  devise :database_authenticatable, :lockable
+
   # class_name wins over the naming convention: target is Widget, not "MainWidget".
   belongs_to :main_widget, class_name: "Widget", foreign_key: :widget_id
   # self-referential: target is Owner, not "Parent".

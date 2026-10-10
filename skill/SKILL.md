@@ -52,7 +52,8 @@ edges(src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER)
   methods are kept), `persists` (the *write* subset of that surface —
   `create!`/`update`/`destroy`/… — on a model constant or an association proxy
   `x.orders.create!`, resolved to the model; this is how a controller/service
-  reaches a model), `association` (has_many/belongs_to/…, honoring an explicit
+  reaches a model — and a Devise accessor counts, so `current_patient.update`
+  is a write on `Patient`), `association` (has_many/belongs_to/…, honoring an explicit
   `class_name:` and falling back to the Rails naming convention; `polymorphic:
   true` is dropped), `emails` (`SomeMailer.action(...).deliver_later`/`deliver_now`
   — the mail-send analog of `enqueues`; the mailer-action call is recorded as

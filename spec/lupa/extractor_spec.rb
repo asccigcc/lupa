@@ -174,6 +174,16 @@ RSpec.describe Lupa::Extractor do
       # NotifyJob.create -> a job, not a model -> filtered out of the write surface.
       expect(edges(src: "DoThing", rel: "persists", dst: "NotifyJob")).to be_empty
     end
+
+    it "resolves a write through an accessor a gem generates" do
+      # current_owner.update -> Owner, because Owner declares a devise scope.
+      expect(edges(src: "ThingsController", rel: "persists", dst: "Owner")).not_to be_empty
+    end
+
+    it "drops a write through an accessor no gem declares" do
+      # current_ghost looks the same, but no scope generates it -> not guessed.
+      expect(edges(src: "ThingsController", rel: "persists").map(&:dst)).to all(eq("Owner"))
+    end
   end
 
   describe "routes" do

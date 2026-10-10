@@ -31,13 +31,19 @@ module Lupa
     def call
       walkers = walk_all
       nodes = walkers.flat_map(&:nodes).uniq(&:name)
-      edges = Resolver.new(nodes, walkers.flat_map(&:associations)).call(walkers.flat_map(&:edges))
+      edges = Resolver.new(nodes, accessors(walkers)).call(walkers.flat_map(&:edges))
       Result.new(nodes:, edges:, skipped:)
     end
 
     private
 
     attr_reader :files, :skipped
+
+    # The app's own associations, plus the accessors its gems generate — both
+    # resolve a method name to a model, so they share one index.
+    def accessors(walkers)
+      walkers.flat_map(&:associations) + Integrations.accessors(walkers.flat_map(&:declarations))
+    end
 
     def walk_all
       walk(files.ruby_files) { |rel| Walker.new(file: rel) } +

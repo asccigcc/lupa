@@ -14,6 +14,13 @@
 - `get :a, :b` records one route per action, and `match ... via:` one route per verb.
 - `root` honors `controller:` and `action:`.
 - An engine's own `X::Engine.routes.draw` block routes to controllers under `X::`.
+- Gem conventions live in `lib/lupa/integrations/`, one module per gem, each keyed on that
+  gem's own vocabulary so an app that doesn't use it records nothing.
+- Devise scopes are read from every `devise` call in a model and every `devise_for`, so a
+  write through the accessor they generate resolves (`current_patient.update` → `Patient`,
+  and `devise_for :otc, class_name: "Patient"` → `current_otc` → `Patient`). The scopes come
+  from the app's own declarations, so an accessor no gem declares — `current_user` in an app
+  with no `User` — stays unresolved rather than being guessed.
 
 ### Changed
 

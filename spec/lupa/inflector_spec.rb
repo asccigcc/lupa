@@ -32,4 +32,14 @@ RSpec.describe Lupa::Inflector do
       expect(described_class.camelize("chart_note")).to eq("ChartNote")
     end
   end
+
+  describe ".underscore" do
+    it "snake-cases a CamelCase constant name" do
+      expect(described_class.underscore("PharmacyUser")).to eq("pharmacy_user")
+    end
+
+    it "leaves a single-word name alone" do
+      expect(described_class.underscore("Patient")).to eq("patient")
+    end
+  end
 end

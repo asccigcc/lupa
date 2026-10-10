@@ -44,6 +44,9 @@ credentials and no environment setup. A scan of a large app takes about 1–2 se
   guessing. A missing edge means "not statically resolvable", not "doesn't happen".
   Dynamic dispatch (`constantize`) is kept as a visible `dispatches` marker so you can see
   where a chain forks.
+- **A few gems beyond Rails itself.** Devise generates code, so its conventions are read too
+  (`lib/lupa/integrations/`). Each one keys on that gem's own vocabulary, so an app that
+  doesn't use it matches nothing — there is nothing to detect and nothing to configure.
 
 ## What it captures
 
@@ -67,6 +70,10 @@ A few rules worth knowing:
   business calls aren't buried under `Model.find`. Scopes and custom class methods are kept.
 - `persists` resolves an association proxy by its name across the app (`orders` → `Order`).
   If the same name points at different models in different places, lupa drops it.
+- The same lookup covers accessors a gem generates. Every model that calls `devise` and every
+  `devise_for` declares a scope, so `current_patient.update(...)` is a write on `Patient` —
+  derived from that app's own declarations, never from a list of likely names. An accessor no
+  gem declares (`current_user` in an app with no `User`) stays unresolved.
 - Constants are looked up the way Ruby does it. `::X` means top level only. Otherwise lupa
   checks the enclosing namespaces first, then the superclass chain, then the top level.
   Association targets follow Rails' own owner-based lookup.

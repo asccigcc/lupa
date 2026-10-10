@@ -7,7 +7,7 @@ module Lupa
   # controller. A target that names no controller (a redirect, a proc) records
   # nothing: the route goes somewhere lupa can't name.
   class RouteRecorder
-    attr_reader :nodes, :edges
+    attr_reader :nodes, :edges, :declarations
 
     # @param scope [RouteScope] turns a route's path and target into the full
     #   path and the controller constant
@@ -17,6 +17,12 @@ module Lupa
       @file = file
       @nodes = []
       @edges = []
+      @declarations = []
+    end
+
+    # Records what an integration found (see Integrations).
+    def declare(found)
+      declarations << found
     end
 
     # @param route [Route] as declared, with its path relative to the scope

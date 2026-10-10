@@ -6,4 +6,9 @@ class ThingsController < ApplicationController
     NotifyJob.perform_later(1)
     External::Api.call # undefined in repo -> must be dropped
   end
+
+  def update
+    current_owner.update(name: "x")  # devise accessor -> persists Owner
+    current_ghost.update(name: "x")  # no such devise scope -> dropped, not guessed
+  end
 end
