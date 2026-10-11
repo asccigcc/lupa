@@ -87,7 +87,7 @@ point Bundler at GitHub:
 
 ```ruby
 group :development do
-  gem "lupa", github: "asccigcc/lupa", tag: "v0.2.0", require: false
+  gem "lupa", github: "asccigcc/lupa", tag: "v0.3.0", require: false
 end
 ```
 
@@ -135,9 +135,13 @@ example queries.
 - `new`/`build` followed by `save` isn't counted as a write yet.
 - Edges are recorded per class, not per action. A route leads to its controller, and from
   there `calls` lists what the whole controller calls, not only that action.
-- Routes don't cover constraints, `concern`s, Devise's default routes (only the
-  `controllers:` overrides), or a namespace wrapped around a `draw` call (each drawn file is
-  read on its own). An engine's routes are recorded relative to where it's mounted.
+- Routes don't cover constraints, `concern`s, or a namespace wrapped around a `draw` call
+  (each drawn file is read on its own). An engine's routes are recorded relative to where
+  it's mounted.
+- `devise_for` records only its `controllers:` overrides, and names them
+  `DEVISE <scope>/<role>` rather than a real URL — the routes Devise generates, and `path:`,
+  `path_names:` and `skip:`, aren't read yet. The controller is correct, so the edge is
+  reliable for "what reaches this class"; the path isn't one you can look up.
 
 ## Development
 
