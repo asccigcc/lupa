@@ -116,3 +116,15 @@ rather than lies**. Treat a missing edge as "not statically resolvable," not
 vanishing, it's recorded as a `dispatches` marker so you can see where a chain
 forks — follow it by reading the named receiver. For other runtime/metaprogrammed
 dispatch, fall back to reading the file or a runtime tool.
+
+## Gem conventions, and teaching lupa a new one
+
+Beyond Rails itself, lupa reads a few gems that generate code — currently Devise,
+which is why `current_patient.update` resolves to `Patient` and
+`before_action :authenticate_patient!` is an `authenticates` edge. Each one keys
+on that gem's own vocabulary, so an app not using it records nothing.
+
+If a convention is missing and you are **working in the lupa repo itself**, the
+contract and a step-by-step recipe are in `docs/integrations.md` — follow it
+rather than inventing a shape; the seams already exist. From a host app, this is
+read-only context: a gem lupa doesn't know is a reason an edge is absent.
