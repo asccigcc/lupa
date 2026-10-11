@@ -57,6 +57,7 @@ credentials and no environment setup. A scan of a large app takes about 1–2 se
 | `invokes` | any other `SomeClass.class_method(...)` on a repo constant |
 | `persists` | a write (`create!`/`update`/`destroy`/…) on a model constant or an association proxy (`patient.orders.create!`) → the model |
 | `emails` | `SomeMailer.action(...).deliver_later/deliver_now` → the mailer |
+| `authenticates` | `before_action :authenticate_patient!` → the model that Devise scope authenticates |
 | `association` | `has_many` / `belongs_to` / … (`class_name:` if given, else naming convention) |
 | `includes` | concern/module includes |
 | `inherits` | superclass |
@@ -70,10 +71,11 @@ A few rules worth knowing:
   business calls aren't buried under `Model.find`. Scopes and custom class methods are kept.
 - `persists` resolves an association proxy by its name across the app (`orders` → `Order`).
   If the same name points at different models in different places, lupa drops it.
-- The same lookup covers accessors a gem generates. Every model that calls `devise` and every
-  `devise_for` declares a scope, so `current_patient.update(...)` is a write on `Patient` —
-  derived from that app's own declarations, never from a list of likely names. An accessor no
-  gem declares (`current_user` in an app with no `User`) stays unresolved.
+- The same lookup covers helpers a gem generates. Each `devise_for` declares a scope, so
+  `current_patient.update(...)` is a write on `Patient` and `before_action
+  :authenticate_patient!` is an `authenticates` edge to it — derived from that app's own
+  mounts, never from a list of likely names. A helper no mount declares (`current_user` in an
+  app with no `User`) stays unresolved.
 - Constants are looked up the way Ruby does it. `::X` means top level only. Otherwise lupa
   checks the enclosing namespaces first, then the superclass chain, then the top level.
   Association targets follow Rails' own owner-based lookup.

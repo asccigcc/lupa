@@ -3,16 +3,19 @@
 module Lupa
   module Integrations
     module Devise
-      # One Devise scope: the name Devise knows it by, the model it
-      # authenticates, and the modules enabled on it (which decide the default
-      # routes `devise_for` mounts).
-      Scope = Data.define(:name, :model, :modules) do
-        # Devise names the record accessor off the scope. The other generated
-        # helpers either answer a question (`patient_signed_in?`) or perform
-        # auth (`authenticate_patient!`) rather than return the record, so they
-        # are not receivers a write can resolve through.
-        # @return [Array<Array(String, String, String)>] [accessor, model, owner]
-        def accessors = [["current_#{name}", model, model]]
+      # One Devise scope: the name Devise knows it by and the model it
+      # authenticates.
+      Scope = Data.define(:name, :model) do
+        # Devise generates four helpers per scope, of which two *denote* the
+        # model plainly enough to resolve an edge through: the record accessor a
+        # write goes through (`current_patient.update`) and the filter that
+        # demands the scope (`authenticate_patient!`). `patient_signed_in?` and
+        # `patient_session` answer something *about* the scope instead, so they
+        # are not names anything resolves through.
+        # @return [Array<Array(String, String, String)>] [name, model, owner]
+        def accessors
+          ["current_#{name}", "authenticate_#{name}!"].map { |helper| [helper, model, model] }
+        end
       end
     end
   end

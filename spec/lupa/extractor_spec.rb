@@ -176,13 +176,28 @@ RSpec.describe Lupa::Extractor do
     end
 
     it "resolves a write through an accessor a gem generates" do
-      # current_owner.update -> Owner, because Owner declares a devise scope.
+      # current_owner.update -> Owner, because `devise_for :owners` maps the scope.
       expect(edges(src: "ThingsController", rel: "persists", dst: "Owner")).not_to be_empty
     end
 
     it "drops a write through an accessor no gem declares" do
       # current_ghost looks the same, but no scope generates it -> not guessed.
       expect(edges(src: "ThingsController", rel: "persists").map(&:dst)).to all(eq("Owner"))
+    end
+  end
+
+  describe "authenticates" do
+    it "resolves an auth filter to the model its scope authenticates" do
+      expect(edges(src: "ThingsController", rel: "authenticates", dst: "Owner")).not_to be_empty
+    end
+
+    it "drops a filter whose scope no mount declares" do
+      # authenticate_ghost! is shaped like the real thing -> still not guessed.
+      expect(edges(src: "ThingsController", rel: "authenticates").map(&:dst)).to all(eq("Owner"))
+    end
+
+    it "does not read skip_before_action as a requirement" do
+      expect(edges(src: "ApplicationController", rel: "authenticates")).to be_empty
     end
   end
 

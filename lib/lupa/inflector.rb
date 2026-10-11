@@ -50,14 +50,6 @@ module Lupa
       word.to_s.split("_").map(&:capitalize).join
     end
 
-    # The inverse, for the names a gem derives from a class (Devise's
-    # `current_pharmacy_user`). Acronyms aren't special-cased.
-    # @param word [String] CamelCase, e.g. "PharmacyUser"
-    # @return [String] e.g. "pharmacy_user"
-    def underscore(word)
-      word.to_s.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
-    end
-
     def singular_word(word)
       return word if UNCOUNTABLE.include?(word)
 

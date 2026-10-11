@@ -5,11 +5,16 @@ module Lupa
     module Devise
       # `devise_for :patients, controllers: { sessions: "patients/sessions" }`.
       #
+      # This is the *only* place a scope comes from. `devise_for` is what calls
+      # `Devise.add_mapping`, and the mapping is what names every helper, so a
+      # model's own `devise` call declares nothing — it just includes modules.
+      # Reading a scope off the model instead would invent helpers the app does
+      # not have: `devise_for :members, class_name: "User"` generates
+      # `current_member`, never `current_user`.
+      #
       # Only the `controllers:` overrides point into the app, so only they are
       # recorded as routes; Devise's own default routes are handled elsewhere,
-      # since expanding them needs the scope's modules from another file.
-      # The mount is also the only place a scope on a differently named model
-      # shows up, via `class_name:`.
+      # since expanding them needs the model's modules from another file.
       module Mount
         module_function
 
@@ -33,7 +38,7 @@ module Lupa
         def scope_for(name, options)
           scope = Inflector.singularize(name)
           model = Ast.literal(options["class_name"]) || Inflector.camelize(scope)
-          Scope.new(name: scope, model:, modules: [])
+          Scope.new(name: scope, model:)
         end
       end
     end

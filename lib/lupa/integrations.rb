@@ -15,7 +15,7 @@ module Lupa
   #
   # both being `call(node, recorder) -> Boolean`, and it writes what it finds
   # through the recorder like anything else. A gem's conventions are often
-  # app-specific — Devise's helper names depend on which models call `devise` —
+  # app-specific — Devise's helper names depend on the app's `devise_for` mounts —
   # so a recognizer *declares* what it found (`recorder.declare`) and the
   # app-wide picture is assembled after the walk.
   module Integrations

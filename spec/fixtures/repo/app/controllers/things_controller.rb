@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 class ThingsController < ApplicationController
+  before_action :authenticate_owner!     # devise scope -> authenticates Owner
+  before_action :authenticate_ghost!     # no such scope -> dropped, not guessed
+  before_action :set_thing               # not a devise helper -> no edge
+
   def create
     DoThing.call(value: 1)
     NotifyJob.perform_later(1)

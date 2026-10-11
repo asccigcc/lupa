@@ -53,12 +53,22 @@ edges(src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER)
   `create!`/`update`/`destroy`/… — on a model constant or an association proxy
   `x.orders.create!`, resolved to the model; this is how a controller/service
   reaches a model — and a Devise accessor counts, so `current_patient.update`
-  is a write on `Patient`), `association` (has_many/belongs_to/…, honoring an explicit
+  is a write on `Patient`), `authenticates` (see below), `association` (has_many/belongs_to/…, honoring an explicit
   `class_name:` and falling back to the Rails naming convention; `polymorphic:
   true` is dropped), `emails` (`SomeMailer.action(...).deliver_later`/`deliver_now`
   — the mail-send analog of `enqueues`; the mailer-action call is recorded as
   this instead of a generic `invokes`), `includes`, `inherits`, `dispatches`,
   `triggers`, `routes`.
+- `authenticates` answers **"who has to be signed in to reach this?"**:
+  `before_action :authenticate_patient!` -> the model that Devise scope
+  authenticates. Use it to find the auth boundary of a controller, or to list
+  everything one role can reach:
+  `lupa query "SELECT src FROM edges WHERE rel='authenticates' AND dst='Provider'"`.
+  Two cautions. It records the *declaration*, so a controller that inherits the
+  filter from `ApplicationController` has no edge of its own — follow `inherits`.
+  And `skip_before_action` is not recorded, so an edge means "this class declares
+  the filter", not "every action requires it"; read `only:`/`except:` in the file
+  to get per-action truth.
 - `routes` connects the HTTP layer to a controller. The `route` node is named
   `VERB /path #action`, e.g. `GET /patients/:patient_id/orders/:id #show` or
   `DEVISE /patients/registrations`, and the edge points at the controller.
