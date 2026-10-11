@@ -12,7 +12,7 @@ module Lupa
       def call(node, recorder)
         return false unless Vocabulary::DELIVER.include?(node.name.to_s)
 
-        mailer = root_constant(node.receiver)
+        mailer = Ast.root_constant(node.receiver)
         return false unless mailer
 
         consume_chain(node.receiver, recorder)
@@ -24,13 +24,6 @@ module Lupa
 
         recorder.consume(recv)
         consume_chain(recv.receiver, recorder)
-      end
-
-      # The constant a send chain roots at, unwrapping `.action` / `.with` calls.
-      def root_constant(recv)
-        return Ast.const_string(recv) if Ast.constant?(recv)
-
-        root_constant(recv.receiver) if Ast.call?(recv)
       end
     end
   end

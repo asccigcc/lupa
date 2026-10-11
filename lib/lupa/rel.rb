@@ -5,15 +5,17 @@ module Lupa
   #
   # - :marker   — dst is not a node (runtime code, a same-class method name);
   #               kept verbatim as a signpost.
-  # - :model    — a write; dst is a model constant or an association accessor,
-  #               and the edge survives only if it lands on a model.
+  # - :model    — dst is a model constant or a name that denotes one (an
+  #               association accessor, a gem-generated helper); the edge
+  #               survives only if it lands on a model.
   # - :superclass — a constant read before the class being defined exists.
   # - :association — a constant looked up from the owning class's name, as Rails does.
   # - :route    — a controller Rails names in full; an exact match or nothing.
   # - :constant — everything else; a constant resolved in its lexical scope.
   module Rel
     RESOLUTION = {
-      "dispatches" => :marker, "triggers" => :marker, "persists" => :model, "association" => :association,
+      "dispatches" => :marker, "triggers" => :marker,
+      "persists" => :model, "authenticates" => :model, "association" => :association,
       "inherits" => :superclass,
       "routes" => :route
     }.freeze

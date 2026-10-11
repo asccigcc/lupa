@@ -5,10 +5,10 @@ module Lupa
   # rel declares (see Rel). Edges that can't be resolved are dropped.
   class Resolver
     # @param nodes [Array<Node>] every node in the repo, unique by name
-    # @param associations [Array<(String, String, String)>] [accessor, raw target, owner]
-    def initialize(nodes, associations)
+    # @param accessors [Array<(String, String, String)>] [accessor, raw target, owner]
+    def initialize(nodes, accessors)
       @consts = ConstIndex.new(nodes)
-      @accessors = AssociationIndex.new(associations, consts)
+      @accessors = AccessorIndex.new(accessors, consts)
     end
 
     # @param edges [Array<Edge>] raw edges

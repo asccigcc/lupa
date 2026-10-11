@@ -1,12 +1,9 @@
 # frozen_string_literal: true
 
-require "fileutils"
-require "open3"
-
 module Lupa
-  # Command-line front end. Thin glue: it builds the graph via Extractor/SqlDump
-  # and shells out to the `sqlite3` binary for storage and queries (no sqlite3
-  # gem dependency). The interesting logic lives in Extractor and Queries.
+  # Command-line front end. Thin glue: each command turns arguments into SQL
+  # (Queries) or builds the graph (Extractor/SqlDump), hands it to Sqlite, and
+  # prints what comes back. No logic of its own beyond argument handling.
   class CLI
     DISPATCH = {
       "scan" => :scan, "query" => :query, "callers" => :callers,
@@ -56,35 +53,25 @@ module Lupa
       DISPATCH[command] or raise Error, "lupa: unknown command #{command.inspect} (try: lupa help)"
     end
 
-    def query   = run_sql(fetch_arg)
-    def callers = run_sql(Queries.callers(fetch_arg))
-    def calls   = run_sql(Queries.calls(fetch_arg))
-    def where   = run_sql(Queries.where(fetch_arg))
-    def impact  = run_sql(Queries.impact(fetch_arg))
+    def query   = print_table(fetch_arg)
+    def callers = print_table(Queries.callers(fetch_arg))
+    def calls   = print_table(Queries.calls(fetch_arg))
+    def where   = print_table(Queries.where(fetch_arg))
+    def impact  = print_table(Queries.impact(fetch_arg))
 
     def path
       from = fetch_arg
       to = fetch_arg
-      trails = Path.new(edge_rows).between(from, to)
+      trails = Path.new(graph.rows(Queries.path_edges)).between(from, to)
       out.puts(trails.empty? ? "lupa: no path from #{from} to #{to} within #{Path::MAX_HOPS} hops" : trails)
-    end
-
-    # Tab-separated: node names and rels never contain a tab.
-    def edge_rows
-      sqlite("-separator", "\t", db_path, Queries.path_edges).lines(chomp: true).map { |row| row.split("\t") }
     end
 
     def scan
       repo = Repo.new(argv.shift || Dir.pwd)
       files = SourceFiles.new(repo.root)
       result = Extractor.call(files:)
-      load_graph(repo.db, SqlDump.call(result))
+      Sqlite.new(repo.db).load_script(SqlDump.call(result))
       report_scan(files.label, result, repo.db)
-    end
-
-    def load_graph(db, sql)
-      FileUtils.mkdir_p(File.dirname(db))
-      sqlite(db, stdin: sql)
     end
 
     def report_scan(label, result, db)
@@ -95,30 +82,20 @@ module Lupa
 
     def stats
       out.puts "nodes by kind:"
-      run_sql(Queries.stats_nodes)
+      print_table(Queries.stats_nodes)
       out.puts
       out.puts "edges by rel:"
-      run_sql(Queries.stats_edges)
+      print_table(Queries.stats_edges)
     end
 
-    def run_sql(sql)
-      out.print(sqlite("-column", "-header", db_path, sql))
-    end
+    def print_table(sql) = out.print(graph.table(sql))
 
-    def sqlite(*, stdin: "")
-      stdout, stderr, status = Open3.capture3("sqlite3", *, stdin_data: stdin)
-      raise Error, "lupa: sqlite3 failed: #{stderr.strip}" unless status.success?
-
-      stdout
-    rescue Errno::ENOENT
-      raise Error, "lupa: the sqlite3 binary is not installed"
-    end
-
-    def db_path
+    # Every command but `scan` reads a graph that must already be there.
+    def graph
       db = Repo.new.db
-      return db if File.exist?(db)
+      raise Error, "lupa: no graph at #{db} — run 'lupa scan' in the repo first." unless File.exist?(db)
 
-      raise Error, "lupa: no graph at #{db} — run 'lupa scan' in the repo first."
+      Sqlite.new(db)
     end
 
     def fetch_arg

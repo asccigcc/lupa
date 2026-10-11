@@ -14,7 +14,7 @@ module Lupa
       def call(node, recorder)
         return false unless Vocabulary::DYNAMIC.include?(node.name.to_s) && node.receiver
 
-        recorder.add(node, "dispatches", node.receiver.slice.gsub(/\s+/, " ")[0, LABEL_LIMIT])
+        recorder.add(node, "dispatches", Ast.source(node.receiver)[0, LABEL_LIMIT])
       end
     end
   end

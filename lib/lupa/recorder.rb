@@ -5,15 +5,22 @@ module Lupa
   # nodes defined, the raw edges found (sourced at the current scope) and the
   # association-name pairs that feed Resolver's `persists` index.
   class Recorder
-    attr_reader :nodes, :edges, :associations
+    attr_reader :nodes, :edges, :associations, :declarations
 
     # @param scope [Scope] supplies the `src` and `file` of every node and edge
     def initialize(scope)
       @scope = scope
-      @nodes = []
-      @edges = []
-      @associations = []
+      @nodes, @edges, @associations, @declarations = Array.new(4) { [] }
       @consumed = Set.new.compare_by_identity
+    end
+
+    # @return [String] the class/module the scope is currently inside
+    def current = scope.current
+
+    # Records what an integration found, for the app-wide picture assembled
+    # after the walk (see Integrations).
+    def declare(found)
+      declarations << found
     end
 
     # Records the class/module the scope is currently inside.

@@ -33,10 +33,12 @@ module Lupa
       option("module")&.then { |value| Inflector.camelize(value) }
     end
 
-    # @return [Array<Array(String, String, String)>] [verb, path, action] per route
+    # @return [Array<Route>] one per REST action the declaration keeps
     def routes
       REST.filter_map do |action, verb, mode, suffix|
-        [verb, [segment(mode), suffix].compact.join("/"), action] if action?(action)
+        next unless action?(action)
+
+        Route.new(verb:, path: [segment(mode), suffix].compact.join("/"), target: "#{controller}##{action}")
       end
     end
 

@@ -14,6 +14,19 @@
 - `get :a, :b` records one route per action, and `match ... via:` one route per verb.
 - `root` honors `controller:` and `action:`.
 - An engine's own `X::Engine.routes.draw` block routes to controllers under `X::`.
+- Gem conventions live in `lib/lupa/integrations/`, one module per gem, each keyed on that
+  gem's own vocabulary so an app that doesn't use it records nothing.
+- Devise scopes are read from the app's `devise_for` mounts, which is what calls
+  `Devise.add_mapping` and so what names every helper. A write through the record accessor
+  resolves (`current_patient.update` → `Patient`, and `devise_for :otc, class_name: "Patient"`
+  → `current_otc` → `Patient`). A model's own `devise` call declares nothing: it only includes
+  modules, so reading a scope off the class name would invent `current_user` for
+  `devise_for :members, class_name: "User"`.
+- New `authenticates` edge: `before_action :authenticate_patient!` → `Patient`, answering what
+  must be signed in to reach a controller. `skip_before_action` is not read as a requirement,
+  since it exempts actions rather than demanding the scope. Helpers no mount declares —
+  `authenticate_csv!`, or `authenticate_user!` in an app with no `User` — are dropped, not
+  guessed.
 
 ### Changed
 
@@ -29,6 +42,8 @@
   instead of reading an action off the path and pairing it with the enclosing namespace.
 - A `concern` body is skipped. Its verbs belong to wherever `concerns:` names it, not to the
   scope the concern is defined in.
+- A `devise_for` inside a `namespace` or `scope` labels its routes with that path prefix, like
+  every other route.
 
 ## 0.2.0 — 2026-10-07
 

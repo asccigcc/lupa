@@ -58,6 +58,20 @@ module Lupa
       node.is_a?(Prism::CallNode)
     end
 
+    # The constant a send chain roots at, unwrapping the calls in between:
+    # `Shop::Engine` in `Shop::Engine.routes`, `Mailer` in `Mailer.with(args)`.
+    # @return [String, nil]
+    def root_constant(node)
+      return const_string(node) if constant?(node)
+
+      root_constant(node.receiver) if call?(node)
+    end
+
+    # @return [String] node's own source text, flattened onto one line
+    def source(node)
+      node.slice.gsub(/\s+/, " ")
+    end
+
     # @return [Array<Prism::Node>] positional + keyword argument nodes of a call
     def args(node)
       node.arguments&.arguments || []
