@@ -12,14 +12,16 @@ module Lupa
     extend Forwardable
 
     # Order matters: specific shapes (a mailer send, a write) must claim a call
-    # before the generic Handoff fallback would record it as `invokes`.
+    # before the generic Handoff fallback would record it as `invokes`. A gem's
+    # vocabulary is the most specific shape of all, so integrations go first.
     RECOGNIZERS = [
+      *Integrations.recognizers,
       Recognizers::Mailer, Recognizers::Dynamic, Recognizers::ConstantMacro,
       Recognizers::Association, Recognizers::Callback, Recognizers::Persist,
       Recognizers::Handoff
     ].freeze
 
-    def_delegators :recorder, :nodes, :edges, :associations
+    def_delegators :recorder, :nodes, :edges, :associations, :declarations
 
     # @param file [String] repo-relative path, stored on every node
     # @param kind [Kind] decides the kind of the classes/modules defined here

@@ -9,6 +9,8 @@ end
 require "lupa"
 
 FIXTURE_REPO = File.expand_path("fixtures/repo", __dir__)
+# An app using none of the gems lupa knows, for proving an integration stays inert.
+PLAIN_REPO = File.expand_path("fixtures/plain_repo", __dir__)
 
 RSpec.configure do |config|
   config.expect_with(:rspec) { |c| c.syntax = :expect }

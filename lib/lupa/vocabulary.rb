@@ -14,6 +14,11 @@ module Lupa
     ASSOCIATIONS = %w[has_many has_one belongs_to has_and_belongs_to_many].freeze
     COLLECTIONS  = %w[has_many has_and_belongs_to_many].freeze
 
+    # Controller filters that *add* a before-action. `skip_before_action` is
+    # absent on purpose: it revokes one, and an integration reading it as a
+    # declaration would record the opposite of what the class says.
+    FILTERS = %w[before_action prepend_before_action append_before_action].freeze
+
     # ActiveRecord lifecycle callbacks. Each wires an event to a (same-class)
     # method, recorded as a `triggers` marker.
     CALLBACKS = %w[

@@ -16,7 +16,7 @@ module Lupa
   class RouteWalker < Prism::Visitor
     HTTP_METHODS = %w[get post put patch delete match].freeze
     HANDLERS = {
-      "namespace" => :visit_namespace, "scope" => :visit_scope, "devise_for" => :record_devise,
+      "namespace" => :visit_namespace, "scope" => :visit_scope,
       "resources" => :record_resource, "resource" => :record_resource, "root" => :record_root,
       "member" => :visit_on, "collection" => :visit_on, "controller" => :visit_controller, "draw" => :visit_draw,
       "concern" => :skip_concern
@@ -32,6 +32,7 @@ module Lupa
     # Extractor reads the walk's result off the walker; the recorder holds it.
     def nodes = recorder.nodes
     def edges = recorder.edges
+    def declarations = recorder.declarations
 
     # Routes declare no model associations; kept so every walker answers the
     # same messages (nodes / edges / associations) for Extractor.
@@ -39,6 +40,7 @@ module Lupa
 
     # Every handler yields exactly once, so the walk always descends.
     def visit_call_node(node)
+      record_integrations(node)
       handler = HANDLERS[node.name.to_s]
       return super unless handler
 
@@ -84,6 +86,12 @@ module Lupa
     # from attributing its verbs to the scope the concern is *defined* in.
     def skip_concern(_node); end
 
+    # A gem's own routing words (Devise's `devise_for`) are not Rails', so they
+    # add vocabulary here rather than override any of it.
+    def record_integrations(node)
+      Integrations.route_recognizers.any? { |recognizer| recognizer.call(node, recorder) }
+    end
+
     # member do ... end / collection do ... end
     def visit_on(node, &)
       scope.on(node.name.to_s, &)
@@ -110,15 +118,6 @@ module Lupa
       options = Ast.keyword_args(node)
       Ast.literal(options["to"]) || Ast.first_literal(node) ||
         RouteTarget.new(nil, options, default: scope.default_controller).to_s
-    end
-
-    # devise_for :patients, controllers: { registrations: "patients/registrations" }
-    def record_devise(node)
-      name = Ast.first_literal(node)
-      Ast.each_pair(Ast.keyword_args(node)["controllers"]) do |role, value|
-        recorder.record(Route.new(verb: "DEVISE", path: "#{name}/#{role}", target: Ast.literal(value)), node)
-      end
-      yield
     end
 
     # resources :widgets | resource :profile, with their REST routes, then the block

@@ -11,6 +11,10 @@ Rails.application.routes.draw do
     registrations: "patients/registrations"
   }
 
+  # no controllers: override — still declares the scope that makes
+  # `current_owner` and `authenticate_owner!` resolve to Owner
+  devise_for :owners
+
   namespace :admin do
     resources :widgets
   end
