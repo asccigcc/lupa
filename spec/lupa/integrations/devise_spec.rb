@@ -84,4 +84,23 @@ RSpec.describe Lupa::Integrations::Devise do
   it "declares nothing in an app that doesn't use devise" do
     expect(walk("class Thing < ApplicationRecord\n  has_many :widgets\nend").declarations).to be_empty
   end
+
+  # An app can define `current_patient` and `authenticate_patient!` itself, with
+  # no Devise anywhere. Nothing here may be attributed to the gem, so the whole
+  # integration has to stay inert on a repo that never says `devise_for`.
+  describe "an app that uses the names but not the gem" do
+    subject(:result) { Lupa::Extractor.call(root: PLAIN_REPO) }
+
+    it "sees the controller and the model" do
+      expect(result.nodes.map(&:name)).to include("ApplicationController", "Patient")
+    end
+
+    it "records no `authenticates` edge for a hand-written filter" do
+      expect(result.edges.select { _1.rel == "authenticates" }).to be_empty
+    end
+
+    it "records no write through a hand-written current_patient" do
+      expect(result.edges.select { _1.rel == "persists" }).to be_empty
+    end
+  end
 end

@@ -42,10 +42,18 @@ return false unless node.name == :devise_for
 ```
 
 An app without the gem then matches nothing, which is why there is no detection
-step, no config and no `Gemfile.lock` sniffing. If the gem's tell is *not*
-distinctive — Avo's is `current_user`, which any app may define — gating must be
-on path (`app/avo/**`) instead. That hook does not exist yet; add it rather than
-gating on a name that will produce false positives.
+step, no config and no `Gemfile.lock` sniffing.
+
+Inertness is not a claim, it is a test. An app may define `current_patient` and
+`authenticate_patient!` as ordinary methods with no Devise anywhere, and nothing
+may be attributed to the gem. `spec/fixtures/plain_repo` is an app using none of
+the gems lupa knows: **assert your integration records nothing against
+`PLAIN_REPO`.** Note that gating on the *helper* name would fail this, which is
+why a scope comes only from the declaring macro — the name is just a lookup key.
+
+If the gem's tell is *not* distinctive — Avo's is `current_user`, which any app
+may define — gating must be on path (`app/avo/**`) instead. That hook does not
+exist yet; add it rather than gating on a name that will produce false positives.
 
 **2. Derive every name from the app. Never hardcode a list of helpers.**
 
@@ -105,6 +113,9 @@ Devise, so the regexp lives in the integration.
 3. **Add fixtures** to `spec/fixtures/repo/`. Always include a **negative**: a
    lookalike that must drop (`authenticate_ghost!`) and, if the macro has one,
    its revoking form. A fixture that only proves the happy path proves little.
+   Then assert inertness against `PLAIN_REPO`, which uses none of the gems — add
+   the names your integration reads to it as hand-written methods if they aren't
+   there yet.
 4. **Implement**, `module_function`, methods ≤5 lines, Sandi Metz limits enforced
    by `.rubocop.yml`.
 5. **Register** the module in `Integrations::ALL`.
