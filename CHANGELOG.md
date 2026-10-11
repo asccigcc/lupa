@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-10-11
+
+Routes now match what `rails routes` reports, and gem-generated code is read through a
+seam rather than hardcoded. Devise is the first gem through it.
 
 ### Added
 
