@@ -55,6 +55,32 @@ RSpec.describe Lupa::Walker do
     expect(edges(src)).to eq([%w[Widget persists Part], %w[Widget persists parts]])
   end
 
+  # The write surface is wider than create/update/save: these all reach the
+  # database, and each was confirmed against ActiveRecord's own source.
+  it "records the whole ActiveRecord write surface" do
+    writes = %w[update_columns update_column update_attribute touch increment! decrement! toggle!
+                destroy! delete_by destroy_by touch_all update_counters create_or_find_by
+                insert_all! reset_counters]
+    src = "class Widget\n  def x\n#{writes.map { |write| "    Part.#{write}" }.join("\n")}\n  end\nend"
+    expect(edges(src)).to all(eq(%w[Widget persists Part]))
+  end
+
+  # increment/decrement/toggle only change the object in memory — only their
+  # bang forms reach the database. Recording the plain forms would report a
+  # write that never happened, so the list is curated, not generated.
+  it "does not read an in-memory mutation as a write" do
+    reads = %w[increment decrement toggle becomes reload first_or_initialize build]
+    src = "class Widget\n  def x\n#{reads.map { |read| "    owner.parts.#{read}" }.join("\n")}\n  end\nend"
+    expect(edges(src)).to be_empty
+  end
+
+  # Metrics libraries claim increment_counter too, and claiming it for the write
+  # surface would suppress the `invokes` edge for every one of those calls.
+  it "leaves increment_counter to whoever owns it in the app" do
+    expect(edges("class Widget\n  def x = Metrics.increment_counter('a')\nend"))
+      .to eq([%w[Widget invokes Metrics]])
+  end
+
   it "classifies constant handoffs and drops the ActiveRecord read surface" do
     src = "class Widget\n  def x\n    Do.call\n    Job.perform_later\n    Part.find(1)\n    Rules.check\n  end\nend"
     expect(edges(src)).to eq([%w[Widget calls Do], %w[Widget enqueues Job], %w[Widget invokes Rules]])

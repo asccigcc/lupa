@@ -31,13 +31,26 @@ module Lupa
       after_initialize after_find after_touch
     ].freeze
 
-    # The ActiveRecord *write* surface. On a model constant or an association
-    # proxy these name a specific model being written — a `persists` edge.
-    # `new`/`build` are construction, not a write, so they stay out.
+    # The ActiveRecord *write* surface, read off ActiveRecord's own source. On a
+    # model constant or an association proxy these name a specific model being
+    # written — a `persists` edge. `new`/`build` are construction, not a write.
+    #
+    # Every name here was confirmed to issue SQL, because the bang suffix is the
+    # only thing separating some of them from a pure in-memory change:
+    # `increment!` runs an UPDATE while `increment` just changes an attribute.
+    # That is why the list is curated and not derived from the method names —
+    # `increment`, `decrement`, `toggle`, `becomes` and `reload` all look like
+    # writes and are not.
+    #
+    # `increment_counter`/`decrement_counter` are ActiveRecord's and still left
+    # out: metrics libraries claim the same names, and listing one here also
+    # means suppressing its `invokes` edge, so a collision costs a real call.
     PERSIST = %w[
-      create create! update update! update_all destroy destroy_all delete delete_all
-      find_or_create_by find_or_create_by! first_or_create first_or_create!
-      insert insert! insert_all upsert upsert_all save save!
+      create create! update update! update_all destroy destroy! destroy_all delete delete_all
+      delete_by destroy_by find_or_create_by find_or_create_by! create_or_find_by create_or_find_by!
+      first_or_create first_or_create! insert insert! insert_all insert_all! upsert upsert_all
+      save save! update_attribute update_attribute! update_column update_columns
+      increment! decrement! toggle! touch touch_all update_counters reset_counters
     ].freeze
 
     # The ActiveRecord *read* surface — too ubiquitous to be useful edges.
@@ -46,7 +59,7 @@ module Lupa
       all none first last second take pluck ids exists? any? many? count size sum
       average minimum maximum order reorder includes preload eager_load joins
       left_joins references select distinct group having limit offset unscoped
-      from lock readonly find_or_initialize_by
+      from lock readonly find_or_initialize_by first_or_initialize reload
     ].freeze
 
     # Constant-receiver methods never recorded as `invokes`: reads, writes
