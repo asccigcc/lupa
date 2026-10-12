@@ -211,8 +211,18 @@ RSpec.describe Lupa::Extractor do
       expect(edges(src: "GET /up #health", rel: "routes", dst: "ThingsController")).not_to be_empty
     end
 
-    it "camelizes a namespaced controller path from devise_for" do
-      expect(edges(rel: "routes", dst: "Patients::RegistrationsController")).not_to be_empty
+    it "expands a devise_for mount into the real routes Devise generates" do
+      expect(edges(rel: "routes", dst: "Patients::RegistrationsController").map(&:src)).to contain_exactly(
+        "GET /patients/sign_up #new", "POST /patients #create", "GET /patients/edit #edit",
+        "PATCH /patients #update", "PUT /patients #update", "DELETE /patients #destroy",
+        "GET /patients/cancel #cancel"
+      )
+    end
+
+    it "records no route for a mount that overrides no controller" do
+      # `devise_for :owners` still declares the scope, but its routes point at
+      # Devise's own controllers, which are not in the repo.
+      expect(edges(rel: "routes").map(&:src).grep(%r{/owners})).to be_empty
     end
 
     it "maps a resource inside a namespace to the prefixed controller" do

@@ -166,9 +166,11 @@ RSpec.describe Lupa::RouteWalker do
     expect(routes("namespace :admin do\n  get 'x', to: '/home#x'\nend")).to eq([["GET /admin/x #x", "HomeController"]])
   end
 
-  it "routes devise controller overrides" do
-    expect(routes("devise_for :patients, controllers: { sessions: 'patients/sessions' }"))
-      .to eq([["DEVISE /patients/sessions", "Patients::SessionsController"]])
+  # What a devise_for expands into is the integration's business, covered in
+  # its own spec; here it only has to reach the recorder at all.
+  it "gives an integration's routing word a turn" do
+    expect(routes("devise_for :patients, controllers: { sessions: 'patients/sessions' }").map(&:last).uniq)
+      .to eq(["Patients::SessionsController"])
   end
 
   it "records the routes file on each edge" do

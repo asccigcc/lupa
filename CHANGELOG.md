@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `devise_for` expands into the routes Devise actually generates, so `/sign_in` is
+  searchable as the path the app really serves. `path:`, `path_names:`, `only:` and `skip:`
+  all move the paths with them, and the table is read off Devise's own
+  `lib/devise/rails/routes.rb`. Only roles the app overrides with `controllers:` are
+  expanded — a role Devise serves from its own controllers has no class in the repo to point
+  at. `omniauth_callbacks` keeps a `DEVISE <path>/auth` marker, since its real paths come
+  from the model's `omniauth_providers`, which a routes file can't see.
+
+### Fixed
+
+- A `devise_for` mount no longer labels its routes with a path the app doesn't serve.
+  `devise_for :patients, path: ''` mounts its session at `/sign_in`, but was recorded as
+  `DEVISE /patients/sessions`, which reads like a URL and was never one.
+
 ## 0.3.0 — 2026-10-11
 
 Routes now match what `rails routes` reports, and gem-generated code is read through a

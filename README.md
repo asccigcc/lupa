@@ -63,7 +63,7 @@ credentials and no environment setup. A scan of a large app takes about 1–2 se
 | `inherits` | superclass |
 | `dispatches` | a `constantize` / `safe_constantize` fork — target computed at runtime |
 | `triggers` | an AR lifecycle callback (`after_create_commit :notify`) → the method it runs (a marker, not a node) |
-| `routes` | a route (`GET /orders/:id #show`) → the controller it points at; `resources` expand into their REST actions |
+| `routes` | a route (`GET /orders/:id #show`) → the controller it points at; `resources` and `devise_for` expand into the routes they generate |
 
 A few rules worth knowing:
 
@@ -138,10 +138,11 @@ example queries.
 - Routes don't cover constraints, `concern`s, or a namespace wrapped around a `draw` call
   (each drawn file is read on its own). An engine's routes are recorded relative to where
   it's mounted.
-- `devise_for` records only its `controllers:` overrides, and names them
-  `DEVISE <scope>/<role>` rather than a real URL — the routes Devise generates, and `path:`,
-  `path_names:` and `skip:`, aren't read yet. The controller is correct, so the edge is
-  reliable for "what reaches this class"; the path isn't one you can look up.
+- `devise_for` expands into the paths Devise really serves, honoring `path:`, `path_names:`,
+  `only:` and `skip:` — but only for the roles the app overrides with `controllers:`. A role
+  Devise serves from its own controllers has no class in the repo, so it's dropped.
+  `omniauth_callbacks` keeps a `DEVISE <path>/auth` marker instead of routes, since its paths
+  are built from the model's `omniauth_providers`. A non-default `sign_out_via` isn't read.
 
 ## Development
 
