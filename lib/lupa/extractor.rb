@@ -30,7 +30,7 @@ module Lupa
     # @return [Result]
     def call
       walkers = walk_all
-      nodes = walkers.flat_map(&:nodes).uniq(&:name)
+      nodes = Definitions.call(walkers.flat_map(&:nodes))
       edges = Resolver.new(nodes, accessors(walkers)).call(walkers.flat_map(&:edges))
       Result.new(nodes:, edges:, skipped:)
     end
