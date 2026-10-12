@@ -55,7 +55,7 @@ credentials and no environment setup. A scan of a large app takes about 1–2 se
 | `calls` | `SomeService.call(...)` |
 | `enqueues` | `SomeJob.perform_later/async/...` |
 | `invokes` | any other `SomeClass.class_method(...)` on a repo constant |
-| `persists` | a write (`create!`/`update`/`destroy`/…) on a model constant or an association proxy (`patient.orders.create!`) → the model |
+| `persists` | a write (`create!`/`update`/`update_columns`/`destroy`/`touch`/…) on a model constant or an association proxy (`patient.orders.create!`) → the model |
 | `emails` | `SomeMailer.action(...).deliver_later/deliver_now` → the mailer |
 | `authenticates` | `before_action :authenticate_patient!` → the model that Devise scope authenticates |
 | `association` | `has_many` / `belongs_to` / … (`class_name:` if given, else naming convention) |
@@ -71,6 +71,10 @@ A few rules worth knowing:
   business calls aren't buried under `Model.find`. Scopes and custom class methods are kept.
 - `persists` resolves an association proxy by its name across the app (`orders` → `Order`).
   If the same name points at different models in different places, lupa drops it.
+- The write surface is ActiveRecord's real one, read off its source, so `update_columns`
+  and `touch` count. Methods that only change an object in memory do not: `increment!` is a
+  write, `increment` isn't. `increment_counter`/`decrement_counter` are left out because
+  metrics clients claim those names too, and a write verb's `invokes` edge is suppressed.
 - The same lookup covers helpers a gem generates. Each `devise_for` declares a scope, so
   `current_patient.update(...)` is a write on `Patient` and `before_action
   :authenticate_patient!` is an `authenticates` edge to it — derived from that app's own
