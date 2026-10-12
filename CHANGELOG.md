@@ -12,6 +12,16 @@
   at. `omniauth_callbacks` keeps a `DEVISE <path>/auth` marker, since its real paths come
   from the model's `omniauth_providers`, which a routes file can't see.
 
+- `persists` now covers ActiveRecord's whole write surface, not just
+  `create`/`update`/`save`. `update_columns`, `update_column`, `update_attribute`, `touch`,
+  `destroy!`, `delete_by`, `destroy_by`, `create_or_find_by`, `insert_all!`, the bang
+  increment/decrement/toggle methods and `update_counters`/`reset_counters` all reach the
+  database, and a write through any of them was either invisible or filed as a generic
+  `invokes`. The names are read off ActiveRecord's own source and judged one at a time,
+  because the name doesn't tell you: `increment!` runs an UPDATE while `increment` only
+  changes an attribute in memory. Those in-memory lookalikes stay out, as do
+  `increment_counter`/`decrement_counter`, whose names metrics clients also claim.
+
 ### Fixed
 
 - A `devise_for` mount no longer labels its routes with a path the app doesn't serve.
