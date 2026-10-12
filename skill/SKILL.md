@@ -70,15 +70,21 @@ edges(src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER)
   the filter", not "every action requires it"; read `only:`/`except:` in the file
   to get per-action truth.
 - `routes` connects the HTTP layer to a controller. The `route` node is named
-  `VERB /path #action`, e.g. `GET /patients/:patient_id/orders/:id #show` or
-  `DEVISE /patients/registrations`, and the edge points at the controller.
+  `VERB /path #action`, e.g. `GET /patients/:patient_id/orders/:id #show`, and the
+  edge points at the controller.
   Start a trace from a URL here: find the route with
   `lupa query "SELECT src, dst FROM edges WHERE rel='routes' AND src LIKE '%/orders%'"`,
   or list the routes that reach a controller with `lupa callers SomeController`.
   `resources`/`resource` expand into their REST actions, honoring `only:`/`except:`,
   `controller:`/`path:`/`module:`, nesting, and `member`/`collection` (block or
-  `on:`). Also covered: explicit `to:`/hash-rocket routes, `root`, `devise_for
-  controllers:`, `namespace` and `scope` (module and path).
+  `on:`). Also covered: explicit `to:`/hash-rocket routes, `root`, `namespace` and
+  `scope` (module and path).
+  A `devise_for` expands into the paths Devise really serves, so searching for
+  `/sign_in` finds the sessions controller. Only roles the app overrides with
+  `controllers:` are there — a role Devise serves from its own controllers has no
+  class in the repo. The one exception is `omniauth_callbacks`, which keeps a
+  `DEVISE <path>/auth` marker because its real paths come from the model's
+  `omniauth_providers`.
   Edges are per class, not per action. So `lupa calls SomeController` lists what
   the whole controller calls; read the action's method to see what that one route does.
 - `dispatches` is special: a `constantize`/`safe_constantize` call whose target
