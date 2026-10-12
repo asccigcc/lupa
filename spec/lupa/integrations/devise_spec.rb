@@ -32,7 +32,7 @@ RSpec.describe Lupa::Integrations::Devise do
     end
 
     it "camelizes a multi-word scope into its model" do
-      expect(draw("devise_for :pharmacy_users").declarations.map(&:model)).to eq(["PharmacyUser"])
+      expect(draw("devise_for :staff_members").declarations.map(&:model)).to eq(["StaffMember"])
     end
 
     it "ignores a model's own devise call, which declares no scope" do
