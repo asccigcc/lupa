@@ -35,16 +35,114 @@ RSpec.describe Lupa::Integrations::Devise do
       expect(draw("devise_for :pharmacy_users").declarations.map(&:model)).to eq(["PharmacyUser"])
     end
 
-    it "still records the controllers: overrides" do
-      walker = draw("devise_for :patients, controllers: { sessions: 'patients/sessions' }")
-      expect(walker.edges.map { [_1.src, _1.dst] }).to eq([["DEVISE /patients/sessions", "Patients::SessionsController"]])
-    end
-
     it "ignores a model's own devise call, which declares no scope" do
       # Devise.add_mapping — and so every helper name — comes from `devise_for`.
       # The model's `devise` only includes modules, so reading a scope off the
       # class name would invent `current_user` for `devise_for :members`.
       expect(walk("class User < ApplicationRecord\n  devise :lockable\nend").declarations).to be_empty
+    end
+  end
+
+  # The expected paths here are Devise 5.0.4's own, read off
+  # `lib/devise/rails/routes.rb` and `lib/devise/mapping.rb`.
+  describe "the routes a devise_for mount generates" do
+    def routes(src)
+      draw(src).edges.map { [_1.src, _1.dst] }
+    end
+
+    def labels(src)
+      routes(src).map(&:first)
+    end
+
+    it "expands sessions into the three routes Devise declares, in its order" do
+      expect(routes("devise_for :admins, controllers: { sessions: 'admins/sessions' }")).to eq(
+        [["GET /admins/sign_in #new", "Admins::SessionsController"],
+         ["POST /admins/sign_in #create", "Admins::SessionsController"],
+         ["DELETE /admins/sign_out #destroy", "Admins::SessionsController"]]
+      )
+    end
+
+    it "mounts at the root when path: is empty, which is where Devise puts it" do
+      src = "devise_for :patients, path: '', controllers: { sessions: 'patients/sessions' }"
+      expect(labels(src)).to eq(["GET /sign_in #new", "POST /sign_in #create", "DELETE /sign_out #destroy"])
+    end
+
+    it "honors a path: that differs from the mount name" do
+      src = "devise_for :otc, path: 'over_the_counter', controllers: { sessions: 'otc/sessions' }"
+      expect(labels(src).first).to eq("GET /over_the_counter/sign_in #new")
+    end
+
+    it "renames a segment that path_names: overrides" do
+      src = "devise_for :admins, path_names: { sign_in: 'login', sign_out: 'logout' }, " \
+            "controllers: { sessions: 'admins/sessions' }"
+      expect(labels(src)).to eq(["GET /admins/login #new", "POST /admins/login #create",
+                                 "DELETE /admins/logout #destroy"])
+    end
+
+    it "expands passwords as the singular resource it is" do
+      expect(labels("devise_for :admins, controllers: { passwords: 'admins/passwords' }")).to contain_exactly(
+        "GET /admins/password/new #new", "POST /admins/password #create",
+        "GET /admins/password/edit #edit", "PATCH /admins/password #update", "PUT /admins/password #update"
+      )
+    end
+
+    it "gives confirmations a show route rather than an edit one" do
+      expect(labels("devise_for :admins, controllers: { confirmations: 'admins/confirmations' }")).to contain_exactly(
+        "GET /admins/confirmation/new #new", "POST /admins/confirmation #create",
+        "GET /admins/confirmation #show"
+      )
+    end
+
+    it "expands unlocks the same shape as confirmations" do
+      expect(labels("devise_for :admins, controllers: { unlocks: 'admins/unlocks' }")).to contain_exactly(
+        "GET /admins/unlock/new #new", "POST /admins/unlock #create", "GET /admins/unlock #show"
+      )
+    end
+
+    # path_names[:registration] defaults to "", so registrations hang off the
+    # mount root: POST /admins, not POST /admins/registration.
+    it "mounts registrations at the scope root, since its path_name defaults to empty" do
+      expect(labels("devise_for :admins, controllers: { registrations: 'admins/registrations' }")).to contain_exactly(
+        "GET /admins/sign_up #new", "POST /admins #create", "GET /admins/edit #edit",
+        "PATCH /admins #update", "PUT /admins #update", "DELETE /admins #destroy",
+        "GET /admins/cancel #cancel"
+      )
+    end
+
+    it "labels the routes with an enclosing scope's path prefix" do
+      src = "scope 'staff' do\n  devise_for :admins, controllers: { sessions: 'admins/sessions' }\nend"
+      expect(labels(src).first).to eq("GET /staff/admins/sign_in #new")
+    end
+
+    describe "roles it does not expand" do
+      it "records nothing for a controller Devise itself owns" do
+        # No controllers: override means devise/sessions, which is not in the repo.
+        expect(routes("devise_for :admins")).to be_empty
+      end
+
+      it "drops a role the mount skips" do
+        src = "devise_for :otc, skip: [:registrations], controllers: { registrations: 'otc/registrations' }"
+        expect(routes(src)).to be_empty
+      end
+
+      it "drops every role when skip: :all" do
+        src = "devise_for :admins, skip: :all, controllers: { sessions: 'admins/sessions' }"
+        expect(routes(src)).to be_empty
+      end
+
+      it "keeps only the roles only: names" do
+        src = "devise_for :admins, only: [:sessions], " \
+              "controllers: { sessions: 'admins/sessions', passwords: 'admins/passwords' }"
+        expect(labels(src)).to all(include("sign_in").or(include("sign_out")))
+      end
+
+      # Devise builds these paths from the model's `omniauth_providers`, which a
+      # routes file cannot see. Only the prefix is knowable, so the controller
+      # stays reachable through a marker instead of an invented URL.
+      it "records only a prefix marker for omniauth_callbacks" do
+        src = "devise_for :patients, controllers: { omniauth_callbacks: 'patients/omniauth_callbacks' }"
+        expect(routes(src)).to eq([["DEVISE /patients/auth", "Patients::OmniauthCallbacksController"]])
+      end
     end
   end
 
