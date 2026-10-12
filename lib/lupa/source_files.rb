@@ -17,8 +17,9 @@ module Lupa
 
     # SKIP is matched against the repo-relative path so the tool's own location
     # (a checkout living under some .../spec/ tree) can't skip a target.
-    # Sorted by full path so `claims/sync.rb` precedes `claims/sync/*.rb` (glob's
-    # own per-directory order doesn't): the first definition seen names a node's file.
+    # Sorted by full path so a scan is reproducible. Which file a node is
+    # attributed to no longer rides on this order — see Definitions — but the
+    # order still breaks ties for a namespace no file spells.
     # @return [Array<String>] absolute paths
     def ruby_files
       Dir.glob(File.join(scan_dir, "**", "*.rb")).sort # rubocop:disable Lint/RedundantDirGlobSort

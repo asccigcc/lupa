@@ -24,6 +24,15 @@
 
 ### Fixed
 
+- A class is now attributed to the file that defines it rather than the first one read.
+  Node identity went by reading order, which is path order, so a file opening a class only
+  to nest something under it could beat the real definition from an earlier-sorting
+  directory. In one real app `app/interactors/task/configurator.rb` beat
+  `app/models/task.rb`, which typed `Task` an interactor — and because a write survives
+  only when it lands on a model, every one of the 83 writes to that model was dropped.
+  `lupa where` pointed at the wrapper too. The file the autoloader would load the constant
+  from now wins; a namespace no file spells is unaffected.
+
 - A `devise_for` mount no longer labels its routes with a path the app doesn't serve.
   `devise_for :patients, path: ''` mounts its session at `/sign_in`, but was recorded as
   `DEVISE /patients/sessions`, which reads like a URL and was never one.

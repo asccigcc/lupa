@@ -67,6 +67,10 @@ credentials and no environment setup. A scan of a large app takes about 1–2 se
 
 A few rules worth knowing:
 
+- A class opened in several files is attributed to the one the autoloader would load it
+  from, so `lupa where Task` names `app/models/task.rb` even when another file says
+  `class Task` just to nest something under it. Edges still record the file they were
+  found in.
 - `invokes` leaves out the ActiveRecord query surface (`find`, `where`, `new`, …) so real
   business calls aren't buried under `Model.find`. Scopes and custom class methods are kept.
 - `persists` resolves an association proxy by its name across the app (`orders` → `Order`).

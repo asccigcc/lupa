@@ -30,6 +30,17 @@ RSpec.describe Lupa::Extractor do
       expect(node("Assemble").file).to eq("app/interactors/assemble.rb")
     end
 
+    # app/interactors/thing/configurator.rb opens `class Thing` just to nest
+    # something under it, and sorts before app/models/thing.rb. The autoloader
+    # would load Thing from the model, so that is the definition that counts.
+    it "prefers the definition the autoloader would load over one that only reopens it" do
+      expect([node("Thing").kind, node("Thing").file]).to eq(["model", "app/models/thing.rb"])
+    end
+
+    it "still records the class nested inside the reopening file" do
+      expect(node("Thing::Configurator").kind).to eq("interactor")
+    end
+
     it "namespaces nested constants" do
       expect(node("A::Dup")).not_to be_nil
       expect(node("Foo::DoThing").kind).to eq("interactor")
@@ -168,6 +179,12 @@ RSpec.describe Lupa::Extractor do
 
     it "resolves a write through an irregular-plural association accessor" do
       expect(edges(src: "ShipIt", rel: "persists", dst: "Delivery")).not_to be_empty
+    end
+
+    # A write only survives if its target is a model, so a reopened class typed
+    # from the wrong file loses every write to it.
+    it "records a write to a model another file reopens" do
+      expect(edges(src: "Thing::Configurator", rel: "persists", dst: "Thing")).not_to be_empty
     end
 
     it "drops a write verb on a non-model constant" do
