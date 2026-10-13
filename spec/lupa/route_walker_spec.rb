@@ -60,8 +60,8 @@ RSpec.describe Lupa::RouteWalker do
     end
 
     it "nests a bare verb inside a resource under :resource_id" do
-      expect(routes("resources :prescriptions, only: [] do\n  get 'renew'\nend"))
-        .to eq([["GET /prescriptions/:prescription_id/renew #renew", "PrescriptionsController"]])
+      expect(routes("resources :subscriptions, only: [] do\n  get 'renew'\nend"))
+        .to eq([["GET /subscriptions/:subscription_id/renew #renew", "SubscriptionsController"]])
     end
 
     it "keeps an explicit to: inside a resource" do
@@ -85,8 +85,8 @@ RSpec.describe Lupa::RouteWalker do
     end
 
     it "record one route per action when a call lists several" do
-      expect(labels("resource :insurance, only: [] do\n  collection do\n    get :card, :info\n  end\nend"))
-        .to eq(["GET /insurance/card #card", "GET /insurance/info #info"])
+      expect(labels("resource :account, only: [] do\n  collection do\n    get :card, :info\n  end\nend"))
+        .to eq(["GET /account/card #card", "GET /account/info #info"])
     end
 
     it "honor action: and controller:" do

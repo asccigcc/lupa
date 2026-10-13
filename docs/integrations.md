@@ -57,8 +57,8 @@ exist yet; add it rather than gating on a name that will produce false positives
 
 **2. Derive every name from the app. Never hardcode a list of helpers.**
 
-28H has 432 `current_user` call sites and no `User` model (they are Avo's). A
-hardcoded Devise helper list would have invented a class.
+One app scanned has ~430 `current_user` call sites and no `User` model (they
+belong to a gem). A hardcoded Devise helper list would have invented a class.
 
 **3. Read the gem's source at the version in `Gemfile.lock`. Never from memory.**
 
@@ -150,6 +150,13 @@ cd /path/to/lupa && git worktree remove --force /tmp/lupa-base
 
 Then reconcile the count against the source. If the app has 79 declaring call
 sites, expect 79 edges; chase any gap before shipping rather than rounding it off.
+
+**Report the numbers, never the app.** The parity target is somebody's private
+codebase, and a commit message, changelog entry or PR body is the wrong place to
+publish its name, its class names, its file paths or what business it is in. Say
+"a large production Rails app", keep the counts and the mechanism, and rename any
+example to a neutral one — a reviewer needs the evidence, not the client. The same
+goes for anything that ships: `CHANGELOG.md` is part of the gem.
 
 ### Spec gotchas
 

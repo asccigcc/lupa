@@ -5,7 +5,7 @@ module Lupa
   # `x.orders.create!` resolves without typing `x`. Two populations feed it:
   # the app's own associations (`orders` -> Order) and the accessors its gems
   # generate (`current_patient` -> Patient, see Integrations). A name declared
-  # with conflicting targets across the app (`child` => both Prescription and
+  # with conflicting targets across the app (`child` => both Message and
   # Delivery) resolves to nil rather than a guess.
   class AccessorIndex
     # @param pairs [Array<(String, String, String)>] [accessor name, raw target, owner]
