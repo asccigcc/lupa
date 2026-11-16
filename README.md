@@ -52,10 +52,11 @@ credentials and no environment setup. A scan of a large app takes about 1–2 se
 
 | rel | from → to |
 |-----|-----------|
-| `calls` | `SomeService.call(...)` |
+| `calls` | `SomeService.call(...)`, or on a fresh instance: `SomeService.new(...).call` |
 | `enqueues` | `SomeJob.perform_later/async/...` |
-| `invokes` | any other `SomeClass.class_method(...)` on a repo constant |
-| `persists` | a write (`create!`/`update`/`update_columns`/`destroy`/`touch`/…) on a model constant or an association proxy (`patient.orders.create!`) → the model |
+| `invokes` | any other `SomeClass.class_method(...)` on a repo constant, or a method on a fresh instance (`SomeClass.new(...).run`) |
+| `persists` | a write (`create!`/`update`/`update_columns`/`destroy`/`touch`/…) on a model constant, an association proxy (`patient.orders.create!`), or a record just built from either (`Order.new(...).save!`) → the model |
+| `sends` | an instance method on a record read through a singular accessor (`current_patient.cancel_subscription`, `order.patient.notify!`) → the model, kept only when that model defines the method; the method is the edge's `message` |
 | `emails` | `SomeMailer.action(...).deliver_later/deliver_now` → the mailer |
 | `authenticates` | `before_action :authenticate_patient!` → the model that Devise scope authenticates |
 | `association` | `has_many` / `belongs_to` / … (`class_name:` if given, else naming convention) |
@@ -75,6 +76,13 @@ A few rules worth knowing:
   business calls aren't buried under `Model.find`. Scopes and custom class methods are kept.
 - `persists` resolves an association proxy by its name across the app (`orders` → `Order`).
   If the same name points at different models in different places, lupa drops it.
+- `sends` is the strictest edge. The receiver must be read through an accessor that returns
+  one record (`belongs_to`, `has_one`, Devise's `current_patient`) and names a single model
+  app-wide, and that model, a module it includes or prepends, or a superclass must `def` the
+  method. A bare local (`patient = …; patient.cancel`), a collection, a method that comes from
+  `delegate`, a column or a gem, and a class method of the same name all drop.
+- `lupa path` follows code that runs. `association` and `authenticates` edges are true facts
+  about a class but no call happens along them, so they are skipped unless you pass `--all`.
 - The write surface is ActiveRecord's real one, read off its source, so `update_columns`
   and `touch` count. Methods that only change an object in memory do not: `increment!` is a
   write, `increment` isn't. `increment_counter`/`decrement_counter` are left out because
@@ -126,8 +134,8 @@ lupa scan                      # builds tmp/lupa.db
 lupa stats
 lupa callers Order::Finalize   # who calls it, with file:line
 lupa calls   CheckoutsController
-lupa impact  CancelOrders      # everything one hop away, in and out, with file:line
-lupa path    ChurnkeyController PartnerApiFillRequestJob   # shortest chains between two classes
+lupa impact  Order::Finalize   # everything one hop away, in and out, with file:line
+lupa path    CheckoutsController ReceiptMailer   # shortest call chains (--all: also "has a" hops)
 lupa where   Order
 lupa query   "SELECT ... FROM edges WHERE ..."
 ```
