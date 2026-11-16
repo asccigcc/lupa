@@ -11,6 +11,20 @@ module Lupa
     DYNAMIC  = %w[constantize safe_constantize].freeze
     MIXINS   = %w[include prepend extend].freeze
 
+    # The mixins that give the including class a module's *instance* methods.
+    # `extend` puts them on the class object instead, so it never answers a
+    # call on an instance and must not count when typing a `sends`.
+    INSTANCE_MIXINS = %w[include prepend].freeze
+
+    # Blocks whose `def`s are class methods, though written without `self.`:
+    # ActiveSupport::Concern's `class_methods do … end`.
+    CLASS_METHOD_BLOCKS = %w[class_methods].freeze
+
+    # Calls that return an instance of their receiver: `Order.new(...)`, and an
+    # association proxy's `patient.orders.build(...)`. A write on the result is
+    # a write to that model.
+    CONSTRUCTORS = %w[new build].freeze
+
     ASSOCIATIONS = %w[has_many has_one belongs_to has_and_belongs_to_many].freeze
     COLLECTIONS  = %w[has_many has_and_belongs_to_many].freeze
 

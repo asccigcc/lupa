@@ -5,16 +5,21 @@ module Lupa
   # rel declares (see Rel). Edges that can't be resolved are dropped.
   class Resolver
     # @param nodes [Array<Node>] every node in the repo, unique by name
-    # @param accessors [Array<(String, String, String)>] [accessor, raw target, owner]
-    def initialize(nodes, accessors)
+    # @param accessors [Array<(String, String, String, Boolean)>] [accessor, raw target, owner, singular]
+    # @param method_defs [Array<(String, String)>] [owner, instance method]
+    # @param mixins [Array<(String, String, Array<String>)>] [owner, raw module, nesting]
+    def initialize(nodes, accessors, method_defs = [], mixins = [])
       @consts = ConstIndex.new(nodes)
       @accessors = AccessorIndex.new(accessors, consts)
+      @method_defs = method_defs
+      @mixins = mixins
     end
 
     # @param edges [Array<Edge>] raw edges
     # @return [Array<Edge>] resolved, de-duplicated edges
     def call(edges)
       hierarchy = Hierarchy.new(edges, consts)
+      @method_index = MethodIndex.new(method_defs, mixins, hierarchy, consts)
       edges.filter_map { |edge| resolve(edge, hierarchy.scopes(edge.nesting)) }.uniq
     end
 
@@ -29,7 +34,7 @@ module Lupa
 
     private
 
-    attr_reader :consts, :accessors
+    attr_reader :consts, :accessors, :method_defs, :mixins, :method_index
 
     # @param scopes [Array<String>] where dst is looked up (see Hierarchy#scopes)
     def resolve(edge, scopes)
@@ -64,6 +69,14 @@ module Lupa
     def model(edge, scopes)
       target = constant(edge, scopes) || accessors.resolve(edge.dst)
       target if consts.model?(target)
+    end
+
+    # The one model a singular accessor returns, kept only when that model (or
+    # what it includes or inherits) defines the method sent. A class sending to
+    # itself through an accessor adds nothing a reader needs, so it is dropped.
+    def message(edge, _scopes)
+      target = accessors.resolve_record(edge.dst)
+      target if consts.model?(target) && target != edge.src && method_index.defines?(target, edge.message)
     end
   end
 end

@@ -31,8 +31,8 @@ module Lupa
     def call
       walkers = walk_all
       nodes = Definitions.call(walkers.flat_map(&:nodes))
-      edges = Resolver.new(nodes, accessors(walkers)).call(walkers.flat_map(&:edges))
-      Result.new(nodes:, edges:, skipped:)
+      resolver = Resolver.new(nodes, accessors(walkers), walkers.flat_map(&:method_defs), walkers.flat_map(&:mixins))
+      Result.new(nodes:, edges: resolver.call(walkers.flat_map(&:edges)), skipped:)
     end
 
     private

@@ -10,8 +10,10 @@ module Lupa
   #
   # `file` is where the edge was found — not necessarily the file defining
   # `src`, since a class can be reopened elsewhere.
-  Edge = Data.define(:src, :rel, :dst, :file, :line, :nesting) do
-    def initialize(src:, rel:, dst:, file:, line:, nesting: [])
+  #
+  # `message` is the instance method a `sends` edge calls; nil on every other rel.
+  Edge = Data.define(:src, :rel, :dst, :file, :line, :nesting, :message) do
+    def initialize(src:, rel:, dst:, file:, line:, nesting: [], message: nil)
       super
     end
   end

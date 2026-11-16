@@ -34,9 +34,11 @@ module Lupa
     def edges = recorder.edges
     def declarations = recorder.declarations
 
-    # Routes declare no model associations; kept so every walker answers the
-    # same messages (nodes / edges / associations) for Extractor.
+    # Routes declare no model associations, methods or mixins; kept so every
+    # walker answers the same messages for Extractor.
     def associations = []
+    def method_defs = []
+    def mixins = []
 
     # Every handler yields exactly once, so the walk always descends.
     def visit_call_node(node)

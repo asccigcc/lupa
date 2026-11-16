@@ -147,9 +147,10 @@ RSpec.describe Lupa::Integrations::Devise do
   end
 
   describe "the names a scope resolves through" do
-    it "maps both the record accessor and the auth filter to the model" do
+    it "maps both the record accessor and the auth filter to the model, only the accessor as a record" do
       expect(scope(name: "patient", model: "Patient").accessors)
-        .to eq([%w[current_patient Patient Patient], %w[authenticate_patient! Patient Patient]])
+        .to eq([["current_patient", "Patient", "Patient", true],
+                ["authenticate_patient!", "Patient", "Patient", false]])
     end
   end
 

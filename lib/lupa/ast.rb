@@ -58,6 +58,19 @@ module Lupa
       node.is_a?(Prism::CallNode)
     end
 
+    # @return [Boolean] whether node builds an instance of its receiver
+    #   (`Order.new(...)`, `owner.parts.build`)
+    def constructor?(node)
+      call?(node) && !node.receiver.nil? && Vocabulary::CONSTRUCTORS.include?(node.name.to_s)
+    end
+
+    # Only `new` on a constant is certain to return an instance of it; a class
+    # method named `build` is the app's own and may return anything.
+    # @return [String, nil] the constant `Const.new(...)` instantiates
+    def constructed(node)
+      const_string(node.receiver) if call?(node) && node.name == :new && constant?(node.receiver)
+    end
+
     # The constant a send chain roots at, unwrapping the calls in between:
     # `Shop::Engine` in `Shop::Engine.routes`, `Mailer` in `Mailer.with(args)`.
     # @return [String, nil]

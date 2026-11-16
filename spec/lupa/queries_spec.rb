@@ -24,10 +24,28 @@ RSpec.describe Lupa::Queries do
     end
   end
 
+  describe ".callers / .calls / .impact on a sends edge" do
+    it "labels the rel with the method it sends" do
+      %w[callers calls impact].each do |query|
+        expect(described_class.public_send(query, "Order")).to include("e.rel || COALESCE(' #' || e.message, '')")
+      end
+    end
+  end
+
   describe ".path_edges" do
-    it "selects distinct resolved edges, leaving out markers" do
+    it "leaves out markers and, by default, the structural edges no code runs along" do
       expect(described_class.path_edges)
-        .to include("SELECT DISTINCT src, rel, dst FROM edges", "rel NOT IN ('dispatches', 'triggers')")
+        .to include("rel NOT IN ('dispatches', 'triggers', 'association', 'authenticates')")
+    end
+
+    it "follows the structural edges when asked for all of them" do
+      sql = described_class.path_edges(all: true)
+      expect(sql).to include("rel NOT IN ('dispatches', 'triggers')")
+      expect(sql).not_to include("association")
+    end
+
+    it "labels a sends hop with its method" do
+      expect(described_class.path_edges).to include("SELECT DISTINCT src, rel || COALESCE('#' || message, '') AS label")
     end
   end
 

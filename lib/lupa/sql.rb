@@ -15,6 +15,12 @@ module Lupa
       "'#{value.to_s.gsub("'", "''")}'"
     end
 
+    # @param value [#to_s, nil]
+    # @return [String] the quoted literal, or NULL for nil
+    def nullable(value)
+      value.nil? ? "NULL" : quote(value)
+    end
+
     # @param value [#to_s] matched literally inside a LIKE pattern
     # @return [String] value with LIKE wildcards (% and _) escaped
     def like_literal(value)

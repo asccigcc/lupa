@@ -2,6 +2,7 @@
 
 class Thing < ApplicationRecord
   include Trackable
+  extend Countable # class-level only: answers no call on a record
 
   has_many :widgets
   belongs_to :owner
