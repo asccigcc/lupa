@@ -38,6 +38,41 @@ RSpec.describe Lupa::Resolver do
     expect(resolve("persists", "items", associations: [%w[items Order X], %w[items Widget X]])).to be_empty
   end
 
+  describe "a sends edge" do
+    let(:nodes) do
+      [Lupa::Node.new("Patient", "model", "p", 1), Lupa::Node.new("Billing", "concern", "b", 1),
+       Lupa::Node.new("Checkout", "service", "c", 1)]
+    end
+    let(:record) { [%w[current_patient Patient Patient] + [true]] }
+
+    def sent(accessor, message, accessors: record, src: "Checkout")
+      edge = Lupa::Edge.new(src:, rel: "sends", dst: accessor, file: "x.rb", line: 1, message:)
+      defs = [%w[Patient cancel!], %w[Billing charge], %w[Checkout run]]
+      described_class.new(nodes, accessors, defs, [["Patient", "Billing", ["Patient"]]])
+                     .call([edge]).map { |e| [e.dst, e.message] }
+    end
+
+    it "lands on the model when it, or a module it includes, defines the method" do
+      expect(sent("current_patient", "cancel!")).to eq([%w[Patient cancel!]])
+      expect(sent("current_patient", "charge")).to eq([%w[Patient charge]])
+    end
+
+    it "drops a method no repo code defines on that model" do
+      expect(sent("current_patient", "status")).to be_empty
+    end
+
+    it "drops a collection accessor, an ambiguous one and one onto a non-model" do
+      expect(sent("patients", "cancel!", accessors: [%w[patients Patient X] + [false]])).to be_empty
+      expect(sent("owner", "cancel!", accessors: [%w[owner Patient X] + [true], %w[owner Checkout Y] + [true]]))
+        .to be_empty
+      expect(sent("checkout", "run", accessors: [%w[checkout Checkout X] + [true]])).to be_empty
+    end
+
+    it "drops a model sending to itself" do
+      expect(sent("current_patient", "cancel!", src: "Patient")).to be_empty
+    end
+  end
+
   it "looks an association target up from the owner's name, as Rails does" do
     edge = Lupa::Edge.new(src: "Admin::Report", rel: "association", dst: "Order", file: "x.rb", line: 1)
     expect(described_class.new(nodes, []).call([edge]).map(&:dst)).to eq(["Admin::Order"])

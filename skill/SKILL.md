@@ -23,35 +23,48 @@ lupa scan            # run from the repo root; scans app/ if present, else whole
 ```bash
 lupa callers Order::Finalize     # who calls/enqueues/includes/inherits this (with file:line)
 lupa calls   CheckoutsController # what this class calls/enqueues/organizes, with file:line
-lupa impact  CancelOrders        # everything one hop from it, in and out, with file:line
-lupa path    FromClass ToClass   # shortest chains of edges from one to the other (≤6 hops, ≤10 chains)
+lupa impact  Order::Finalize     # everything one hop from it, in and out, with file:line
+lupa path    FromClass ToClass   # shortest call chains from one to the other (≤6 hops, ≤10 chains)
+lupa path    --all From To       # same, also stepping through association/authenticates edges
 lupa where   Order               # file:line where it's defined (matches namespaced too)
 lupa stats                       # node kinds + edge counts (sanity check the scan)
 lupa query   "SQL"               # arbitrary query against the schema below
 ```
 
-`path` follows edges in their direction and skips markers, so "no path" means
-no *static* chain — the real one may run through a `dispatches` fork or a
-runtime-chosen organizer step. Walk `calls`/`impact` out from the start to see where the static chain stops.
+`path` follows edges in their direction and skips markers. By default it also
+skips `association` and `authenticates`: "Patient has many subscriptions" and
+"must be signed in as Patient" are true, but no code runs along them, so a chain
+through one only looked like a call chain. Pass `--all` to follow them anyway.
+A `sends` hop prints with its method, `A -sends#cancel!-> Patient`. "No path"
+means no *static* chain — the real one may run through a `dispatches` fork, a
+runtime-chosen organizer step, or a call on an untyped local. Walk
+`calls`/`impact` out from the start to see where the static chain stops. A path is
+the *shortest* static chain, not necessarily the one a given action takes.
 
 ## Schema
 
 ```
 nodes(name TEXT PK, kind TEXT, file TEXT, line INTEGER)
-edges(src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER)
+edges(src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER, message TEXT)
 -- src/dst are node names; file:line is where the edge was found (a reopened
--- class can record edges outside the file that defines it)
+-- class can record edges outside the file that defines it); message is the
+-- instance method a `sends` edge calls, NULL on every other rel
 ```
+
+`callers`, `calls` and `impact` print a `sends` edge's rel as `sends #method`.
 
 - `kind`: controller, interactor, model, job, service, policy, mailer,
   component, serializer, concern, module, route, other.
-- `rel`: `calls` (`Const.call`), `enqueues` (`perform_later/async/...`),
+- `rel`: `calls` (`Const.call`, and `Const.new(...).call` — a fresh instance
+  counts as its class), `enqueues` (`perform_later/async/...`),
   `organizes` (Interactor::Organizer steps), `invokes` (any other
-  `Const.class_method(...)` on a repo constant; the ActiveRecord query surface —
+  `Const.class_method(...)` on a repo constant, or any method on
+  `Const.new(...)`; the ActiveRecord query surface —
   `find`/`where`/`create`/`new`/… — is excluded, but scopes and custom class
   methods are kept), `persists` (the *write* subset of that surface —
-  `create!`/`update`/`update_columns`/`destroy`/`touch`/… — on a model constant
-  or an association proxy `x.orders.create!`, resolved to the model; this is how
+  `create!`/`update`/`update_columns`/`destroy`/`touch`/… — on a model constant,
+  an association proxy `x.orders.create!`, or a record just built from either
+  `Order.new(...).save!` / `x.orders.build.save`, resolved to the model; this is how
   a controller/service reaches a model — and a Devise accessor counts, so
   `current_patient.update` is a write on `Patient`. In-memory-only methods are
   excluded, so `increment!` is a write and `increment` is not; so are
@@ -60,8 +73,20 @@ edges(src TEXT, rel TEXT, dst TEXT, file TEXT, line INTEGER)
   `class_name:` and falling back to the Rails naming convention; `polymorphic:
   true` is dropped), `emails` (`SomeMailer.action(...).deliver_later`/`deliver_now`
   — the mail-send analog of `enqueues`; the mailer-action call is recorded as
-  this instead of a generic `invokes`), `includes`, `inherits`, `dispatches`,
-  `triggers`, `routes`.
+  this instead of a generic `invokes`), `sends` (see below), `includes`,
+  `inherits`, `dispatches`, `triggers`, `routes`.
+- `sends` answers **"who calls this model's instance method?"** —
+  `current_patient.cancel_subscription` is `sends` → `Patient` with message
+  `cancel_subscription`:
+  `lupa query "SELECT src, file, line FROM edges WHERE rel='sends' AND dst='Patient' AND message='cancel_subscription'"`.
+  It is recorded only when the receiver is read through an accessor that returns
+  one record (`belongs_to`, `has_one`, Devise `current_*`) naming a single model
+  app-wide, **and** that model, a module it includes/prepends, or a superclass
+  `def`s the method. So it under-reports by design: a bare local
+  (`patient = …; patient.cancel`), a block parameter, a method parameter, an
+  accessor name two models declare with different targets, a collection, and any
+  method from `delegate`/`attr_*`/a column/a gem all drop. A missing `sends` is
+  "not typeable statically" — grep `\.method_name\b` to find the rest.
 - `authenticates` answers **"who has to be signed in to reach this?"**:
   `before_action :authenticate_patient!` -> the model that Devise scope
   authenticates. Use it to find the auth boundary of a controller, or to list
@@ -118,7 +143,8 @@ SELECT src FROM edges WHERE rel='includes' AND dst='Trackable';
 lupa only records a resolved edge when the receiver constant resolves to a
 class/module defined in the repo, using Ruby's lexical lookup (`::X` is
 top-level; a bare name binds in the enclosing namespace, then the superclass
-chain, then the top level). Calls on local
+chain, then the top level), or, for `sends`, when a single-record accessor and a
+`def` both vouch for the target. Calls on local
 variables and ambiguous short constant names are **dropped, not guessed** — so the graph **under-reports
 rather than lies**. Treat a missing edge as "not statically resolvable," not
 "definitely absent." Dynamic constant dispatch is the exception: instead of

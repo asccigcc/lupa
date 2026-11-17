@@ -14,5 +14,9 @@ class ThingsController < ApplicationController
   def update
     current_owner.update(name: "x")  # devise accessor -> persists Owner
     current_ghost.update(name: "x")  # no such devise scope -> dropped, not guessed
+    current_owner.lock_out!          # sends Owner #lock_out!, defined on Owner
+    current_owner.unlock_access!     # Devise's own method, no def in the repo -> dropped
+    current_owner.audit!             # only a class method by that name -> dropped
+    current_ghost.lock_out!          # no such devise scope -> dropped
   end
 end

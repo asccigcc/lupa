@@ -39,8 +39,9 @@ RSpec/ExampleLength:
 
 Gemspec/DevelopmentDependencies:
   EnforcedStyle: gemspec
-# Recorder#add returns true so a recognizer can end with it; it is a command, not a predicate.
+# Recorder#add(_message) returns true so a recognizer can end with it; it is a command, not a predicate.
 Naming/PredicateMethod:
   AllowedMethods:
     - add
+    - add_message
     - call

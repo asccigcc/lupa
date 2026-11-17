@@ -17,10 +17,12 @@ module Lupa
         true
       end
 
+      # A collection accessor returns a relation, not a record, so only a
+      # singular one can type the receiver of a `sends`.
       def record(node, target, recorder)
         recorder.add(node, "association", target)
         name = Ast.first_literal(node)
-        recorder.associate(name, target) if name
+        recorder.associate(name, target, singular: !Vocabulary::COLLECTIONS.include?(node.name.to_s)) if name
       end
 
       # An explicit `class_name:` wins over the naming convention (that guess is

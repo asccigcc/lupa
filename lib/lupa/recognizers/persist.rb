@@ -2,9 +2,11 @@
 
 module Lupa
   module Recognizers
-    # An ActiveRecord write on a model constant (`Order.create!`) or through an
-    # association proxy (`patient.orders.create!`) -> `persists`. The dst is the
-    # constant, or the accessor name that Resolver maps via the association index.
+    # An ActiveRecord write on a model constant (`Order.create!`), through an
+    # association proxy (`patient.orders.create!`), or on a record just built
+    # from either (`Order.new(attrs).save!`, `patient.orders.build.save`) ->
+    # `persists`. The dst is the constant, or the accessor name that Resolver
+    # maps via the association index.
     module Persist
       module_function
 
@@ -17,9 +19,11 @@ module Lupa
       end
 
       # Only a method-call receiver counts as an accessor: a bare local
-      # (`rec.save`) that shares an association's name is not that model.
+      # (`rec.save`) that shares an association's name is not that model. A
+      # constructor is unwrapped to what it builds an instance of.
       def target_for(recv)
         return Ast.const_string(recv) if Ast.constant?(recv)
+        return target_for(recv.receiver) if Ast.constructor?(recv)
 
         recv.name.to_s if Ast.call?(recv)
       end

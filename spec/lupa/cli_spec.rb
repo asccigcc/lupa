@@ -65,6 +65,19 @@ RSpec.describe Lupa::CLI do
       expect(out.string).to include("no path from NotifyMailer to ThingsController")
     end
 
+    it "labels a sends hop with the method it calls" do
+      run("path", "ThingsController", "Owner")
+      expect(out.string).to include("ThingsController -sends#lock_out!-> Owner")
+    end
+
+    # Thing has_many :widgets, but no Thing code calls Widget: "has a" is not a call chain.
+    it "follows structural edges only when asked to" do
+      run("path", "Thing", "Widget")
+      expect(out.string).to include("no path from Thing to Widget", "--all follows them")
+      run("path", "--all", "Thing", "Widget")
+      expect(out.string).to include("Thing -association-> Widget")
+    end
+
     it "prints stats by kind and rel" do
       run("stats")
       expect(out.string).to include("nodes by kind:", "edges by rel:", "persists")

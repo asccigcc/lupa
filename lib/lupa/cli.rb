@@ -18,7 +18,8 @@ module Lupa
         lupa callers NAME    who calls/enqueues/includes/inherits NAME
         lupa calls NAME      what NAME calls/enqueues/organizes
         lupa impact NAME     everything one hop from NAME, in and out, with file:line
-        lupa path FROM TO    the shortest chains of edges from FROM to TO
+        lupa path FROM TO    the shortest call chains from FROM to TO
+                             (--all also follows association/authenticates edges)
         lupa where NAME      where NAME is defined
         lupa stats           node/edge counts
 
@@ -60,10 +61,16 @@ module Lupa
     def impact  = print_table(Queries.impact(fetch_arg))
 
     def path
+      all = !argv.delete("--all").nil?
       from = fetch_arg
       to = fetch_arg
-      trails = Path.new(graph.rows(Queries.path_edges)).between(from, to)
-      out.puts(trails.empty? ? "lupa: no path from #{from} to #{to} within #{Path::MAX_HOPS} hops" : trails)
+      trails = Path.new(graph.rows(Queries.path_edges(all:))).between(from, to)
+      out.puts(trails.empty? ? no_path(from, to, all) : trails)
+    end
+
+    def no_path(from, to, all)
+      skipped = all ? "" : " (association and authenticates edges skipped; --all follows them)"
+      "lupa: no path from #{from} to #{to} within #{Path::MAX_HOPS} hops#{skipped}"
     end
 
     def scan

@@ -4,6 +4,23 @@
 
 ### Added
 
+- `sends`: an instance method called on a record read through an accessor —
+  `current_patient.cancel_subscription` is `sends` → `Patient`, with the method kept in a new
+  `message` column. A model's own methods were invisible before, so "who cancels a
+  subscription?" had no answer. It is the strictest edge lupa records: the accessor must
+  return one record (`belongs_to`, `has_one`, Devise's `current_*`) and name a single model
+  app-wide, and that model, a module it includes or prepends, or a superclass must `def` the
+  method. A bare local, a collection, a method from `delegate`/a column/a gem, a module the
+  model only `extend`s and a class method of the same name all drop. On a large production
+  Rails app it added 1,353 edges and lost none; a random sample of 80 all had the method
+  defined in the target's own lineage.
+
+- A fresh instance counts as its class. `Builder.new(args).call` is a `calls` Builder, any
+  other method on it an `invokes`, and `Order.new(attrs).save!` or
+  `patient.orders.build.save` a `persists` — all three were dropped, because the receiver
+  was a call rather than a constant. The same app gained 47 `calls` and 491 `invokes`. Only
+  `new` on a constant is read this way: a class method named `build` may return anything.
+
 - `devise_for` expands into the routes Devise actually generates, so `/sign_in` is
   searchable as the path the app really serves. `path:`, `path_names:`, `only:` and `skip:`
   all move the paths with them, and the table is read off Devise's own
@@ -21,6 +38,18 @@
   because the name doesn't tell you: `increment!` runs an UPDATE while `increment` only
   changes an attribute in memory. Those in-memory lookalikes stay out, as do
   `increment_counter`/`decrement_counter`, whose names metrics clients also claim.
+
+### Changed
+
+- `lupa path` follows code that runs. It no longer steps through `association` or
+  `authenticates` edges, which are true of a class but carry no call: a chain like
+  `Controller -authenticates-> Patient -association-> Subscription` read as a call path and
+  was not one. `--all` restores the old search. A `sends` hop prints with its method
+  (`-sends#cancel!->`), and "no path" now says which edges were skipped.
+
+- The `edges` table has a sixth column, `message` (NULL except on `sends`). `callers`,
+  `calls` and `impact` show it as `sends #method`. Queries that name their columns are
+  unaffected; an `INSERT` or a positional `SELECT *` against the table must account for it.
 
 ### Fixed
 

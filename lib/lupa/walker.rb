@@ -18,10 +18,10 @@ module Lupa
       *Integrations.recognizers,
       Recognizers::Mailer, Recognizers::Dynamic, Recognizers::ConstantMacro,
       Recognizers::Association, Recognizers::Callback, Recognizers::Persist,
-      Recognizers::Handoff
+      Recognizers::Message, Recognizers::Handoff
     ].freeze
 
-    def_delegators :recorder, :nodes, :edges, :associations, :declarations
+    def_delegators :recorder, :nodes, :edges, :associations, :declarations, :method_defs, :mixins
 
     # @param file [String] repo-relative path, stored on every node
     # @param kind [Kind] decides the kind of the classes/modules defined here
@@ -30,6 +30,7 @@ module Lupa
       @kind = kind
       @scope = Scope.new(file)
       @recorder = Recorder.new(scope)
+      @singleton_depth = 0
     end
 
     def visit_module_node(node)
@@ -45,12 +46,35 @@ module Lupa
 
     def visit_call_node(node)
       record_call(node)
+      Vocabulary::CLASS_METHOD_BLOCKS.include?(node.name.to_s) ? on_singleton { super } : super
+    end
+
+    # Instance methods only: a `sends` edge is a call on an instance, so a
+    # class method that shares its name must never vouch for one.
+    def visit_def_node(node)
+      recorder.defines(node.name.to_s) if instance_method?(node)
       super
+    end
+
+    def visit_singleton_class_node(node)
+      on_singleton { super }
     end
 
     private
 
-    attr_reader :kind, :scope, :recorder
+    attr_reader :kind, :scope, :recorder, :singleton_depth
+
+    def instance_method?(node)
+      node.receiver.nil? && !scope.empty? && singleton_depth.zero?
+    end
+
+    # Inside `class << self` or `class_methods do`, a bare `def` is a class method.
+    def on_singleton
+      @singleton_depth += 1
+      yield
+    ensure
+      @singleton_depth -= 1
+    end
 
     def define(node, node_kind)
       scope.within(Ast.const_string(node.constant_path)) do

@@ -181,6 +181,19 @@ RSpec.describe Lupa::Extractor do
       expect(edges(src: "ShipIt", rel: "persists", dst: "Delivery")).not_to be_empty
     end
 
+    it "records a fresh instance's call, invoke and write against its own class" do
+      expect(edges(src: "BuildsThings").map { |e| [e.rel, e.dst] })
+        .to contain_exactly(%w[calls ShipIt], %w[invokes ShipIt], %w[persists Thing])
+    end
+
+    # Every lookalike in the fixtures must drop: a method Devise or a column
+    # provides, a class method by that name, an unknown scope, a collection, a
+    # module the model extends, and a bare local.
+    it "records a sends only through a singular accessor onto a model defining the method" do
+      expect(edges(rel: "sends").map { |e| [e.src, e.dst, e.message] })
+        .to contain_exactly(%w[ThingsController Owner lock_out!], %w[Label Thing track!])
+    end
+
     # A write only survives if its target is a model, so a reopened class typed
     # from the wrong file loses every write to it.
     it "records a write to a model another file reopens" do

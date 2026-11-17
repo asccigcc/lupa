@@ -14,8 +14,15 @@ module Lupa
         rel = RELS[node.name.to_s]
         return false unless rel
 
-        Ast.constants(node).each { |const| recorder.add(node, rel, const) }
+        Ast.constants(node).each { |const| record(node, rel, const, recorder) }
         true
+      end
+
+      # An included or prepended module's instance methods answer calls on the
+      # class too, which is what lets a `sends` be checked against them.
+      def record(node, rel, const, recorder)
+        recorder.add(node, rel, const)
+        recorder.mix(const) if Vocabulary::INSTANCE_MIXINS.include?(node.name.to_s)
       end
     end
   end

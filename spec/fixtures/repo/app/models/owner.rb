@@ -13,4 +13,9 @@ class Owner < ApplicationRecord
   belongs_to :subject, polymorphic: true
   # the other half of the ambiguous `gizmos` name (points to Owner, not Widget).
   has_many :gizmos, class_name: "Owner"
+
+  def lock_out!; end # what `current_owner.lock_out!` sends
+
+  # a class method sharing an instance call's name must never vouch for it
+  def self.audit!; end
 end
